@@ -1,5 +1,5 @@
-FROM r-base:4.3.3
+FROM rocker/shiny-verse:4.0.3
 
-RUN R -e "install.packages(c('shiny', 'plotly'))"
+RUN R -e "install.packages('plotly')"
 
 CMD R main.R
