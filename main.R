@@ -41,16 +41,30 @@ for (state in unique(c(y$From, y$To))){
 # there's some strange problem with (6);(7), it detects the destination 7 as different than
 # the source 7? I cut it out of the data for the time being
 
-chordDiagram(y, order = sector_order,
-             annotationTrack = c("name", "grid"),
-             directional = 1, 
-             direction.type = "arrows")
-circos.clear()
-
+circos.par$gap.degree <- c(rep(1, times = 7), 15, rep(1, times = 6), 15)
+circos.par$start.degree <- -7.5 
+values = runif(length(sector_order))
 chordDiagram(y, order = sector_order,
              annotationTrack = c("name", "grid"),
              directional = 1, 
              direction.type = "arrows",
-             link.arr.type = "big.arrow", 
-             diffHeight = -mm_h(2))
+             preAllocateTracks = list(
+               track.height = 0.05  # reserves one custom track (you can adjust height)
+             ))
+xlim <- get.cell.meta.data("xlim")
+ylim <- get.cell.meta.data("ylim")
+circos.track(
+  track.index = 2,  # This is the index of the preallocated track (1-based)
+  panel.fun = function(x, y) {
+    sector.name <- get.cell.meta.data("sector.index")
+    xcenter <- get.cell.meta.data("xcenter")
+    circos.rect(
+      xleft = xlim[1], ybottom = ylim[1],
+      xright = xlim[2], ytop = ylim[2],
+      col = rand_color(1),
+      border = NA)
+    }, 
+  bg.border = NA
+)
 circos.clear()
+
