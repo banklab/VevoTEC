@@ -8,21 +8,21 @@ library(circlize)
 x <- read.table("example_data/transitions_data.d", header = T, sep = ",")
 
 # we have two arrow types to indicate directionality
-chordDiagram(x, directional = 1, 
-             direction.type = "arrows", 
-             link.arr.type = "big.arrow", 
-             diffHeight = -mm_h(2), 
-             # color ramp can be set to, for instance, the indegree
-             grid.col = colorRampPalette(c("lightblue", "red"))(8),
-             annotationTrack = c("name", "grid"))
-circos.clear()
-      
-#colors of the arrows can be changed
-chordDiagram(x, directional = 1, 
-             direction.type = "arrows", 
-             grid.col = colorRampPalette(c("lightblue", "red"))(8),
-             annotationTrack = c("name", "grid"))
-circos.clear()
+# chordDiagram(x, directional = 1, 
+#              direction.type = "arrows", 
+#              link.arr.type = "big.arrow", 
+#              diffHeight = -mm_h(2), 
+#              # color ramp can be set to, for instance, the indegree
+#              grid.col = colorRampPalette(c("lightblue", "red"))(8),
+#              annotationTrack = c("name", "grid"))
+# circos.clear()
+#       
+# #colors of the arrows can be changed
+# chordDiagram(x, directional = 1, 
+#              direction.type = "arrows", 
+#              grid.col = colorRampPalette(c("lightblue", "red"))(8),
+#              annotationTrack = c("name", "grid"))
+# circos.clear()
 
 
 
@@ -33,6 +33,10 @@ sector_order <- c("(0)", "(1)", "(2)", "(3)",
            "(4)", "(5)", "(6)", "(7)",
            "(0,3)","(0,7)","(1,2)","(1,5)",
            "(2,3)","(2,7)","(5,7)")
+
+# Yes, I have ensured they are in the correct order. ignore warning
+sector_colors <- c(rep("red", times = 8), rep("tan", times = 7))
+
 ratio <- c()
 for (state in unique(c(y$From, y$To))){
   ratio <- c(ratio, sum(str_count(state, y$From)) / sum(c(str_count(state, y$From), str_count(state,y$To))))
@@ -45,24 +49,37 @@ circos.par$gap.degree <- c(rep(1, times = 7), 15, rep(1, times = 6), 15)
 circos.par$start.degree <- -7.5 
 values = runif(length(sector_order))
 chordDiagram(y, order = sector_order,
-             annotationTrack = c("name", "grid"),
+             annotationTrack = "grid",
              directional = 1, 
+             grid.col = sector_colors,
              direction.type = "arrows",
              preAllocateTracks = list(
-               track.height = 0.05  # reserves one custom track (you can adjust height)
+               list(track.height = 0.05),
+               list(track.height = 0.05),
+               list(track.height = 0.05)
              ))
-xlim <- get.cell.meta.data("xlim")
-ylim <- get.cell.meta.data("ylim")
 circos.track(
-  track.index = 2,  # This is the index of the preallocated track (1-based)
+  track.index = 3, 
   panel.fun = function(x, y) {
-    sector.name <- get.cell.meta.data("sector.index")
-    xcenter <- get.cell.meta.data("xcenter")
+    xlim <- CELL_META$xlim
+    ylim <- CELL_META$ylim
+    sector.name <- CELL_META$sector.index
+    xcenter <- CELL_META$xcenter
     circos.rect(
       xleft = xlim[1], ybottom = ylim[1],
       xright = xlim[2], ytop = ylim[2],
-      col = rand_color(1),
+      col = rand_color(1), # need to figure out an opacity parameter
       border = NA)
+    }, 
+  bg.border = NA
+)
+circos.track(
+  track.index = 2,
+  panel.fun = function(x, y) {
+    sector.name <- CELL_META$sector.index
+    xcenter <- CELL_META$xcenter
+    circos.text(CELL_META$xcenter, CELL_META$ylim[1], CELL_META$sector.index, 
+                facing = "clockwise", niceFacing = TRUE, adj = c(0, 0.5))  
     }, 
   bg.border = NA
 )
