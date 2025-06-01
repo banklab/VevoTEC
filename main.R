@@ -3,47 +3,51 @@ library(shiny)
 #library(plotly) #we actually don't need this since chord diagrams aren't compatible with ggplot
 library(circlize)
 
-# data may take the form of an adjacency matrix or dataframe
-# i am starting with a simple csv of first-order transitions
-x <- read.table("example_data/transitions_data.d", header = T, sep = ",")
-
-# we have two arrow types to indicate directionality
-# chordDiagram(x, directional = 1, 
-#              direction.type = "arrows", 
-#              link.arr.type = "big.arrow", 
-#              diffHeight = -mm_h(2), 
-#              # color ramp can be set to, for instance, the indegree
-#              grid.col = colorRampPalette(c("lightblue", "red"))(8),
-#              annotationTrack = c("name", "grid"))
-# circos.clear()
-#       
-# #colors of the arrows can be changed
-# chordDiagram(x, directional = 1, 
-#              direction.type = "arrows", 
-#              grid.col = colorRampPalette(c("lightblue", "red"))(8),
-#              annotationTrack = c("name", "grid"))
-# circos.clear()
-
-
-
 # ok now trying a dataset with higher order interactions (two resources)
-y <- read.table("example_data/transitions_data_full.d", header = T, sep = ";") %>% 
-  drop_na()
+z <- read.table("example_data/transitions_matrix.dat", sep = " ", header = T, check.names = F) %>% 
+  as.matrix()
+rownames(z) <- colnames(z) # for now, we will only accept a symmetrical matrix
 
-eco_transition_plot <- function(dataset){
-  
-  sector_order <- c("(0)", "(1)", "(2)", "(3)",
-                    "(4)", "(5)", "(6)", "(7)",
-                    "(0,3)","(0,7)","(1,2)","(1,5)",
-                    "(2,3)","(2,7)","(5,7)")
-  
+labels <- colnames(z)
+to_binary <- function(x, width = ceiling(log2(7))) { # should later handle whatever the largest number is
+  paste0(rev(as.integer(intToBits(as.integer(x)))[1:width]), collapse = "")
+}
+
+# Extract numbers from each column name
+extract_numbers <- function(label) {
+  # Remove parentheses
+  nums <- gsub("[()]", "", label)
+  # Split by comma if needed
+  strsplit(nums, ",")[[1]]
+}
+
+# Convert and format
+binary_labels <- sapply(labels, function(name) {
+  nums <- extract_numbers(name)
+  bin <- sapply(nums, function(n) to_binary(n))
+  paste(bin, collapse = ",\n")
+})
+
+eco_transition_plot <- function(dataset, ...){
+  #optional addition of binary_labels and sector_order through ...
+  if (exists("sector_order") != TRUE){
+    sector_order <- c("(0)", "(1)", "(2)", "(4)",
+                      "(3)", "(5)", "(6)", "(7)",
+                      "(5,7)","(2,7)","(2,3)","(1,5)",
+                      "(1,2)","(0,7)","(0,3)")
+    names(sector_order) = sector_order
+  }
+  if (exists("labels") != TRUE){
+    labels <- sector_order
+  }
+    
   # Yes, I have ensured they are in the correct order. ignore warning
-  sector_colors <- c(rep("red", times = 4),"darkred",rep("red", times = 3), rep("tan", times = 4), "brown", rep("tan", times = 2))
+  sector_colors <- c(rep("#FF0000", times = 3),"#940000",rep("#FF0000", times = 4), rep("#c8a772", times = 2), "#B08133", rep("#c8a772", times = 4))
   
   # graded colors based on indegree
   ratio <- c()
-  for (state in unique(c(y$From, y$To))){
-    ratio <- c(ratio, sum(str_count(state, y$From)) / sum(c(str_count(state, y$From), str_count(state,y$To))))
+  for (i in 1:ncol(z)){
+    ratio <- z[,i] / sum(z[,i],z[i,])
   }
   
   # there's some strange problem with (6);(7), it detects the destination 7 as different than
@@ -53,21 +57,21 @@ eco_transition_plot <- function(dataset){
   circos.par$gap.degree <- c(rep(1, times = 7), 15, rep(1, times = 6), 15)
   
   #calculate the starting offset such that 0 is at the bottom
-  zero_num_connections <- length(which(y$To == "(0)")) + length(which(y$From == "(0)"))
-  total_spots <- 2 * nrow(y)
-  degrees_per_spot <- (360 - sum(circos.par$gap.degree[circos.par$gap.degree > 1])) / 
-    total_spots
-  circos.par$start.degree <- -90 + (zero_num_connections * degrees_per_spot / 2)
+  zero_num_connections <- sum(dataset[1,]) + sum(dataset[,1])
+  total_connections <- 2 * sum(z)
+  degrees_per_connection <- (360 - sum(circos.par$gap.degree[circos.par$gap.degree > 1])) / 
+    total_connections
+  circos.par$start.degree <- -90 + (zero_num_connections * degrees_per_connection / 2)
   
   values = runif(length(sector_order))
-  chordDiagram(y, order = sector_order,
+  chordDiagram(dataset, order = sector_order,
                annotationTrack = "grid",
                directional = 1, 
                grid.col = sector_colors,
                direction.type = "arrows",
                preAllocateTracks = list(
                  list(track.height = 0.05),
-                 list(track.height = 0.05),
+                 list(track.height = 0.025),
                  list(track.height = 0.05)
                ))
 #  circos.track(
@@ -88,13 +92,13 @@ eco_transition_plot <- function(dataset){
   circos.track(
     track.index = 2,
     panel.fun = function(x, y) {
-      sector.name <- CELL_META$sector.index
+      sector.name <- labels[CELL_META$sector.index]
       xcenter <- CELL_META$xcenter
-      circos.text(CELL_META$xcenter, CELL_META$ylim[1], CELL_META$sector.index, 
+      circos.text(CELL_META$xcenter, CELL_META$ylim[1], labels[CELL_META$sector.index], 
                   facing = "downward", niceFacing = TRUE)  
       }, 
     bg.border = NA
   )
   circos.clear()
 }
-eco_transition_plot(y)
+eco_transition_plot(z, binary_labels)
