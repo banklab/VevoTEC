@@ -6,9 +6,10 @@ library(circlize)
 # ok now trying a dataset with higher order interactions (two resources)
 z <- read.table("example_data/transitions_matrix.dat", sep = " ", header = T, check.names = F) %>% 
   as.matrix()
-rownames(z) <- colnames(z) # for now, we will only accept a symmetrical matrix
+rownames(z) <- colnames(z) # for now, we will only accept a matrix with identically ordered labels
+input_labels <- colnames(z) # creating the default label vector for later use
+names(input_labels) <- input_labels
 
-labels <- colnames(z)
 to_binary <- function(x, width = ceiling(log2(7))) { # should later handle whatever the largest number is
   paste0(rev(as.integer(intToBits(as.integer(x)))[1:width]), collapse = "")
 }
@@ -22,36 +23,33 @@ extract_numbers <- function(label) {
 }
 
 # Convert and format
-binary_labels <- sapply(labels, function(name) {
+binary_labels <- sapply(input_labels, function(name) {
   nums <- extract_numbers(name)
   bin <- sapply(nums, function(n) to_binary(n))
-  paste(bin, collapse = ",\n")
+  paste(bin, collapse = "\n")
 })
 
-eco_transition_plot <- function(dataset, ...){
-  #optional addition of binary_labels and sector_order through ...
-  if (exists("sector_order") != TRUE){
-    sector_order <- c("(0)", "(1)", "(2)", "(4)",
-                      "(3)", "(5)", "(6)", "(7)",
-                      "(5,7)","(2,7)","(2,3)","(1,5)",
-                      "(1,2)","(0,7)","(0,3)")
-    names(sector_order) = sector_order
-  }
-  if (exists("labels") != TRUE){
-    labels <- sector_order
-  }
-    
+custom_order <- c("(0)", "(1)", "(2)", "(4)",
+                  "(3)", "(5)", "(6)", "(7)",
+                  "(5,7)","(2,7)","(2,3)","(1,5)",
+                  "(1,2)","(0,7)","(0,3)")
+names(custom_order) = custom_order
+
+eco_transition_plot <- function(dataset, 
+                                sorting = TRUE, 
+                                sector_order = NULL, 
+                                plot_labels = NULL, ...){
+  
+  if(is.null(sector_order) && sorting == FALSE){ # if no custom order is defined
+    sector_order <- input_labels # Defaults to input label order
+  } else if(is.null(sector_order) && sorting == TRUE){ # If no custom order but sorting desired
+    sector_order <- sort_labels(input_labels)
+  } # else will provide custom sector order
+  if (is.null(plot_labels)){ # if custom labels are not provided, copy from sector_order
+    plot_labels <- sector_order
+  } 
   # Yes, I have ensured they are in the correct order. ignore warning
-  sector_colors <- c(rep("#FF0000", times = 3),"#940000",rep("#FF0000", times = 4), rep("#c8a772", times = 2), "#B08133", rep("#c8a772", times = 4))
-  
-  # graded colors based on indegree
-  ratio <- c()
-  for (i in 1:ncol(z)){
-    ratio <- z[,i] / sum(z[,i],z[i,])
-  }
-  
-  # there's some strange problem with (6);(7), it detects the destination 7 as different than
-  # the source 7? I cut it out of the data for the time being
+  sector_colors <- c(rep("#FF0000", times = 3),"#B20000",rep("#FF0000", times = 4), rep("#c8a772", times = 2), "#B08133", rep("#c8a772", times = 4))
   
   # create gaps between different interaction orders
   circos.par$gap.degree <- c(rep(1, times = 7), 15, rep(1, times = 6), 15)
@@ -92,13 +90,13 @@ eco_transition_plot <- function(dataset, ...){
   circos.track(
     track.index = 2,
     panel.fun = function(x, y) {
-      sector.name <- labels[CELL_META$sector.index]
+      sector.name <- CELL_META$sector.index
       xcenter <- CELL_META$xcenter
-      circos.text(CELL_META$xcenter, CELL_META$ylim[1], labels[CELL_META$sector.index], 
-                  facing = "downward", niceFacing = TRUE)  
-      }, 
+      circos.text(CELL_META$xcenter, CELL_META$ylim[1], plot_labels[sector.name],
+                  facing = "downward", niceFacing = TRUE)
+      },
     bg.border = NA
   )
   circos.clear()
 }
-eco_transition_plot(z, binary_labels)
+eco_transition_plot(z, sector_order = custom_order, plot_labels = binary_labels)
