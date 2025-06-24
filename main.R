@@ -2,7 +2,9 @@ library(tidyverse)
 library(shiny)
 #library(plotly) #we actually don't need this since chord diagrams aren't compatible with ggplot
 library(circlize)
+library(igraph)
 
+#RxC
 # ok now trying a dataset with higher order interactions (two resources)
 z <- read.table("example_data/transitions_matrix.dat", sep = " ", header = T, check.names = F) %>% 
   as.matrix()
@@ -28,6 +30,40 @@ binary_labels <- sapply(input_labels, function(name) {
   bin <- sapply(nums, function(n) to_binary(n))
   paste(bin, collapse = "\n")
 })
+
+sort_labels <- function(){
+  
+}
+
+generate_sector_colors <- function(data, binary_labels){
+  #
+  # function to detect the number of sectors in a binary label vector, and assign a color for plotting
+  #
+  color_options <- c("#FF0000", "#B20000",  
+                     "#c8a772", "#B08133", 
+                     "#77b763", "#4e7741", 
+                     "#a69eb5", "#413a52")
+  sector_colors <- c()
+  sector_order <- 1 # *2 - 1
+  sector_index <- 1
+  i <- 1
+  for(label in binary_labels){
+    print(label)
+    if (nchar(label) > nchar(binary_labels[[sector_index]])){ # track where the transition between interaction orders is
+      sector_index <- i
+      sector_order <- sector_order + 1
+    }
+    print(sector_order)
+    print(sector_index)
+    if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(data[i,]) == 0){ # if it is within the current interaction order and is a peak:
+      sector_colors <- c(sector_colors, color_options[[sector_order]])
+    } else if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(data[i,]) != 0){ # else if is not a peak
+      sector_colors <- c(sector_colors, color_options[[(sector_order * 2) - 1]])
+    }
+    i <- i + 1
+  }
+  return(sector_colors)
+}
 
 custom_order <- c("(0)", "(1)", "(2)", "(4)",
                   "(3)", "(5)", "(6)", "(7)",
@@ -99,4 +135,8 @@ eco_transition_plot <- function(dataset,
   )
   circos.clear()
 }
-eco_transition_plot(z, sector_order = custom_order, plot_labels = binary_labels)
+
+# generate a min span tree from an unweighted graph
+z_min <- as_adjacency_matrix(mst(graph_from_adjacency_matrix(z)), sparse = F)
+
+eco_transition_plot(z_min, sector_order = custom_order, plot_labels = binary_labels)
