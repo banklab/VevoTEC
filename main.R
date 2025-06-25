@@ -5,6 +5,7 @@ library(circlize)
 library(igraph)
 
 #RxC
+
 # ok now trying a dataset with higher order interactions (two resources)
 z <- read.table("example_data/transitions_matrix.dat", sep = " ", header = T, check.names = F) %>% 
   as.matrix()
@@ -12,6 +13,9 @@ rownames(z) <- colnames(z) # for now, we will only accept a matrix with identica
 input_labels <- colnames(z) # creating the default label vector for later use
 names(input_labels) <- input_labels
 
+
+
+# functions and code to convert to create a vector of binary labels
 to_binary <- function(x, width = ceiling(log2(7))) { # should later handle whatever the largest number is
   paste0(rev(as.integer(intToBits(as.integer(x)))[1:width]), collapse = "")
 }
@@ -25,20 +29,28 @@ extract_numbers <- function(label) {
 }
 
 # Convert and format
-binary_labels <- sapply(input_labels, function(name) {
-  nums <- extract_numbers(name)
-  bin <- sapply(nums, function(n) to_binary(n))
-  paste(bin, collapse = "\n")
-})
-
-sort_labels <- function(){
-  
+label_convert <- function(input_labels){
+  binary_labels <- sapply(input_labels, function(name) {
+    nums <- extract_numbers(name)
+    bin <- sapply(nums, function(n) to_binary(n))
+    paste(bin, collapse = "\n")
+  })
+  return(binary_labels)
 }
 
-generate_sector_colors <- function(data, binary_labels){
-  #
+sort_labels <- function(){
+  # function to sort labels by increasing distance from 0. otherwise the provided order is used
+}
+custom_order <- c("(0)", "(1)", "(2)", "(4)",
+                  "(3)", "(5)", "(6)", "(7)",
+                  "(5,7)","(2,7)","(2,3)","(1,5)",
+                  "(1,2)","(0,7)","(0,3)")
+names(custom_order) = custom_order
+
+
+
+generate_sector_colors <- function(dataset, input_labels){
   # function to detect the number of sectors in a binary label vector, and assign a color for plotting
-  #
   color_options <- c("#FF0000", "#B20000",  
                      "#c8a772", "#B08133", 
                      "#77b763", "#4e7741", 
@@ -46,36 +58,57 @@ generate_sector_colors <- function(data, binary_labels){
   sector_colors <- c()
   sector_order <- 1 # *2 - 1
   sector_index <- 1
+  binary_labels <- label_convert(input_labels)
   i <- 1
   for(label in binary_labels){
-    print(label)
     if (nchar(label) > nchar(binary_labels[[sector_index]])){ # track where the transition between interaction orders is
       sector_index <- i
       sector_order <- sector_order + 1
     }
-    print(sector_order)
-    print(sector_index)
-    if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(data[i,]) == 0){ # if it is within the current interaction order and is a peak:
-      sector_colors <- c(sector_colors, color_options[[sector_order]])
-    } else if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(data[i,]) != 0){ # else if is not a peak
+    if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(dataset[i,]) == 0){ # if it is within the current interaction order and is a peak:
+      sector_colors <- c(sector_colors, color_options[[sector_order * 2]])
+    } else if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(dataset[i,]) != 0){ # else if is not a peak
       sector_colors <- c(sector_colors, color_options[[(sector_order * 2) - 1]])
     }
     i <- i + 1
   }
+  names(sector_colors) = input_labels
   return(sector_colors)
 }
 
-custom_order <- c("(0)", "(1)", "(2)", "(4)",
-                  "(3)", "(5)", "(6)", "(7)",
-                  "(5,7)","(2,7)","(2,3)","(1,5)",
-                  "(1,2)","(0,7)","(0,3)")
-names(custom_order) = custom_order
+hamming_matrix <- function(n) {
+  # Generate all binary strings of length n
+  nodes <- as.matrix(expand.grid(rep(list(c(0,1)), n)))
+  num_nodes <- nrow(nodes)
+  
+  adj_matrix <- matrix(0, nrow = num_nodes, ncol = num_nodes)
+  
+  for (i in 1:(num_nodes - 1)) {
+    for (j in (i + 1):num_nodes) {
+      if (sum(nodes[i, ] != nodes[j, ]) == 1) {
+        adj_matrix[i, j] <- 1
+        adj_matrix[j, i] <- 1  # symmetric since undirected
+      }
+    }
+  }
+  
+  rownames(adj_matrix) <- apply(nodes, 1, paste0, collapse = "")
+  colnames(adj_matrix) <- rownames(adj_matrix)
+  
+  return(adj_matrix)
+}
+
+hamming_dist <- function(g1, g2) {
+  # takes two binary strings and returns the hamming distance between them
+  return(sum(strsplit(g1, "")[[1]] != strsplit(g2, "")[[1]]))
+}
 
 eco_transition_plot <- function(dataset, 
                                 sorting = TRUE, 
                                 sector_order = NULL, 
                                 plot_labels = NULL, ...){
   
+  sector_colors <- generate_sector_colors(dataset, plot_labels)
   if(is.null(sector_order) && sorting == FALSE){ # if no custom order is defined
     sector_order <- input_labels # Defaults to input label order
   } else if(is.null(sector_order) && sorting == TRUE){ # If no custom order but sorting desired
@@ -83,9 +116,9 @@ eco_transition_plot <- function(dataset,
   } # else will provide custom sector order
   if (is.null(plot_labels)){ # if custom labels are not provided, copy from sector_order
     plot_labels <- sector_order
-  } 
-  # Yes, I have ensured they are in the correct order. ignore warning
-  sector_colors <- c(rep("#FF0000", times = 3),"#B20000",rep("#FF0000", times = 4), rep("#c8a772", times = 2), "#B08133", rep("#c8a772", times = 4))
+  } else {
+    plot_labels <- label_convert(plot_labels) # assuming the provided labels are in base 10, we convert to binary
+  }
   
   # create gaps between different interaction orders
   circos.par$gap.degree <- c(rep(1, times = 7), 15, rep(1, times = 6), 15)
@@ -139,4 +172,37 @@ eco_transition_plot <- function(dataset,
 # generate a min span tree from an unweighted graph
 z_min <- as_adjacency_matrix(mst(graph_from_adjacency_matrix(z)), sparse = F)
 
-eco_transition_plot(z_min, sector_order = custom_order, plot_labels = binary_labels)
+min_distance <- function(dataset, source, targets){
+  # Function to determine the min number of mutations required to produce a state. this may not actually be achievable on a given landscape 
+  data_as_graph <- graph_from_adjacency_matrix(dataset) # convert input data to graph
+  full_network_matrix <- hamming_matrix(3) # make a general (full landscape) matrix
+  full_network_graph <- graph_from_adjacency_matrix(full_network_matrix) # convert matrix to graph
+  # find the shortest path between the source and target: if target is monotypic, take hamming dist
+  if (length(targets) == 1){
+    return(hamming_dist(source, targets))
+  } else {
+  # if target has two, then find the shortest combined path by:
+  # find the min hamming dist between all genotypes in state
+    min_dist_target <- "0"
+    hamdist <- Inf
+    for (target in targets){
+      if (hamming_dist(source, target) < hamdist){
+        hamdist = hamming_dist(source, target)
+        min_dist_target = target
+      }
+    }
+  }
+  # calc shortest path from source to this target
+  second_sources <- shortest_paths(full_network_graph, source, min_dist_target)[[1]]
+  # find min hamming dist between each genotype in path and the second genotype
+  second_min_dist_target <- "0"
+  second_hamdist <- Inf
+  for (source in second_sources){
+    distances(full_network_graph, sources, second_target)
+  }
+  # add hamming distances together
+}
+shortest_paths(data_as_graph, 3, c(13,5))$vpath # nodes are stored in the vector V(g)$name, which is 1 indexed. you cannot reference by names
+distances(graph_from_adjacency_matrix(full_matrix), v = 1, to = c(3,7))
+
+eco_transition_plot(z, sector_order = custom_order, plot_labels = input_labels)
