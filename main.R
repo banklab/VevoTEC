@@ -172,16 +172,18 @@ eco_transition_plot <- function(dataset,
 # generate a min span tree from an unweighted graph
 z_min <- as_adjacency_matrix(mst(graph_from_adjacency_matrix(z)), sparse = F)
 
-min_distance <- function(dataset, source, targets){
+min_distance <- function(source, targets){
   # Function to determine the min number of mutations required to produce a state. this may not actually be achievable on a given landscape 
-  data_as_graph <- graph_from_adjacency_matrix(dataset) # convert input data to graph
-  full_network_matrix <- hamming_matrix(3) # make a general (full landscape) matrix
+  bitwidth <- nchar(source)
+  full_network_matrix <- hamming_matrix(bitwidth) # make a general (full landscape) matrix
   full_network_graph <- graph_from_adjacency_matrix(full_network_matrix) # convert matrix to graph
   # find the shortest path between the source and target: if target is monotypic, take hamming dist
+  targets <- str_split_1(targets, "\n")
+  names(targets) <- targets
   if (length(targets) == 1){
     return(hamming_dist(source, targets))
   } else {
-  # if target has two, then find the shortest combined path by:
+  # if target has two or more, then find the shortest combined path by:
   # find the min hamming dist between all genotypes in state
     min_dist_target <- "0"
     hamdist <- Inf
@@ -191,18 +193,25 @@ min_distance <- function(dataset, source, targets){
         min_dist_target = target
       }
     }
+    targets <- targets[names(targets) != min_dist_target]
+    # calc shortest path from source to this target
+    second_source_indices <- as.vector(shortest_paths(full_network_graph, source, min_dist_target)[[1]][[1]])
+    # nodes are stored in the vector V(g)$name, which is 1 indexed. You cannot reference by names
+    second_sources <- V(full_network_graph)$name[second_source_indices]
+    # find min hamming dist between each genotype in path and the second genotype
+    second_min_dist_target <- "0"
+    second_hamdist <- Inf
+    for (second_source in second_sources){
+      if (hamming_dist(second_source, targets) < second_hamdist){
+        second_hamdist <- hamming_dist(second_source, targets)
+        second_min_dist_source <- second_source
+      }
+    }
+    # add hamming distances together
+    hamdist <- hamdist + second_hamdist
   }
-  # calc shortest path from source to this target
-  second_sources <- shortest_paths(full_network_graph, source, min_dist_target)[[1]]
-  # find min hamming dist between each genotype in path and the second genotype
-  second_min_dist_target <- "0"
-  second_hamdist <- Inf
-  for (source in second_sources){
-    distances(full_network_graph, sources, second_target)
-  }
-  # add hamming distances together
+  return(hamdist)
 }
-shortest_paths(data_as_graph, 3, c(13,5))$vpath # nodes are stored in the vector V(g)$name, which is 1 indexed. you cannot reference by names
-distances(graph_from_adjacency_matrix(full_matrix), v = 1, to = c(3,7))
+#distances(graph_from_adjacency_matrix(full_matrix), v = 1, to = c(3,7))
 
-eco_transition_plot(z, sector_order = custom_order, plot_labels = input_labels)
+eco_transition_plot(z_min, sector_order = custom_order, plot_labels = input_labels)
