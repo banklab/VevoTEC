@@ -38,8 +38,26 @@ label_convert <- function(input_labels){
   return(binary_labels)
 }
 
-sort_labels <- function(){
-  # function to sort labels by increasing distance from 0. otherwise the provided order is used
+sort_labels <- function(input_labels){
+  # function to sort labels by increasing distance from 0. Otherwise the provided order is used.
+  binary_labels <- label_convert(input_labels)
+  distances <- lapply(binary_labels, function(x) min_distance("000", x))
+  names(distances) <- input_labels
+  
+  sector_order <- c()
+  sector_begin <- 1
+  sector_end <- NULL
+  i <- 1
+  for (label in binary_labels){
+    #sector_end <- i
+    if (nchar(label) > nchar(binary_labels[[sector_begin]]) || i == length(binary_labels)){ # track where the transition between interaction orders is
+      sector_end <- i - 1
+      sector_order <- c(sector_order, list(sector_begin, sector_end))
+      sector_begin <- i
+    }
+    i <- i + 1
+  }
+  return(sector_order)
 }
 custom_order <- c("(0)", "(1)", "(2)", "(4)",
                   "(3)", "(5)", "(6)", "(7)",
@@ -77,7 +95,7 @@ generate_sector_colors <- function(dataset, input_labels){
 }
 
 hamming_matrix <- function(n) {
-  # Generate all binary strings of length n
+  # Generate an adjacency matrix for a hamming space with dimension n
   nodes <- as.matrix(expand.grid(rep(list(c(0,1)), n)))
   num_nodes <- nrow(nodes)
   
