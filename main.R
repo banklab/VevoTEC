@@ -41,29 +41,30 @@ label_convert <- function(input_labels){
 sort_labels <- function(input_labels){
   # function to sort labels by increasing distance from 0. Otherwise the provided order is used.
   binary_labels <- label_convert(input_labels)
-  distances <- lapply(binary_labels, function(x) min_distance("000", x))
+  distances <- sapply(binary_labels, function(x) min_distance("000", x))
   names(distances) <- input_labels
   
-  sector_order <- c()
+  # determine which indices belong to which interaction orders
+  interaction_order <- c()
+  sector = 1
   sector_begin <- 1
-  sector_end <- NULL
   i <- 1
   for (label in binary_labels){
-    #sector_end <- i
-    if (nchar(label) > nchar(binary_labels[[sector_begin]]) || i == length(binary_labels)){ # track where the transition between interaction orders is
-      sector_end <- i - 1
-      sector_order <- c(sector_order, list(sector_begin, sector_end))
+    if (nchar(label) > nchar(binary_labels[[sector_begin]])){ # track where the transition between interaction orders is
+      sector <- sector + 1
       sector_begin <- i
     }
+    interaction_order <- c(interaction_order, sector)
     i <- i + 1
   }
-  return(sector_order)
+  
+  # split 
+  sorted_labels <- c(names(sort(distances[which(interaction_order == 1)], decreasing = F)), 
+                     names(sort(distances[which(interaction_order == 2)], decreasing = T)))
+  names(sorted_labels) <- sorted_labels
+  return(sorted_labels)
 }
-custom_order <- c("(0)", "(1)", "(2)", "(4)",
-                  "(3)", "(5)", "(6)", "(7)",
-                  "(5,7)","(2,7)","(2,3)","(1,5)",
-                  "(1,2)","(0,7)","(0,3)")
-names(custom_order) = custom_order
+custom_order <- sort_labels(input_labels)
 
 
 
@@ -232,4 +233,4 @@ min_distance <- function(source, targets){
 }
 #distances(graph_from_adjacency_matrix(full_matrix), v = 1, to = c(3,7))
 
-eco_transition_plot(z_min, sector_order = custom_order, plot_labels = input_labels)
+eco_transition_plot(z, sector_order = custom_order, plot_labels = input_labels)
