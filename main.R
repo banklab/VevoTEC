@@ -1,11 +1,10 @@
 library(tidyverse)
 library(shiny)
-#library(plotly) #we actually don't need this since chord diagrams aren't compatible with ggplot
 library(circlize)
 library(igraph)
 
 #RxC
-
+runExample("01_hello")
 # ok now trying a dataset with higher order interactions (two resources)
 z <- read.table("example_data/transitions_matrix.dat", sep = " ", header = T, check.names = F) %>% 
   as.matrix()
@@ -64,9 +63,6 @@ sort_labels <- function(input_labels){
   names(sorted_labels) <- sorted_labels
   return(sorted_labels)
 }
-custom_order <- sort_labels(input_labels)
-
-
 
 generate_sector_colors <- function(dataset, input_labels){
   # function to detect the number of sectors in a binary label vector, and assign a color for plotting
@@ -188,9 +184,6 @@ eco_transition_plot <- function(dataset,
   circos.clear()
 }
 
-# generate a min span tree from an unweighted graph
-z_min <- as_adjacency_matrix(mst(graph_from_adjacency_matrix(z)), sparse = F)
-
 min_distance <- function(source, targets){
   # Function to determine the min number of mutations required to produce a state. this may not actually be achievable on a given landscape 
   bitwidth <- nchar(source)
@@ -231,6 +224,8 @@ min_distance <- function(source, targets){
   }
   return(hamdist)
 }
-#distances(graph_from_adjacency_matrix(full_matrix), v = 1, to = c(3,7))
 
+#distances(graph_from_adjacency_matrix(full_matrix), v = 1, to = c(3,7))
+custom_order <- sort_labels(input_labels)
 eco_transition_plot(z, sector_order = custom_order, plot_labels = input_labels)
+runApp("app", display.mode = "showcase")
