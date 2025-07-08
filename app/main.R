@@ -228,4 +228,3 @@ min_distance <- function(source, targets){
 #distances(graph_from_adjacency_matrix(full_matrix), v = 1, to = c(3,7))
 custom_order <- sort_labels(input_labels)
 eco_transition_plot(z, sector_order = custom_order, plot_labels = input_labels)
-runApp("app", display.mode = "showcase")
