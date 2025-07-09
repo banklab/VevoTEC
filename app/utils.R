@@ -1,34 +1,22 @@
 library(tidyverse)
-library(shiny)
 library(circlize)
 library(igraph)
-
-#RxC
-runExample("01_hello")
-# ok now trying a dataset with higher order interactions (two resources)
-z <- read.table("example_data/transitions_matrix.dat", sep = " ", header = T, check.names = F) %>% 
-  as.matrix()
-rownames(z) <- colnames(z) # for now, we will only accept a matrix with identically ordered labels
-input_labels <- colnames(z) # creating the default label vector for later use
-names(input_labels) <- input_labels
-
-
 
 # functions and code to convert to create a vector of binary labels
 to_binary <- function(x, width = ceiling(log2(7))) { # should later handle whatever the largest number is
   paste0(rev(as.integer(intToBits(as.integer(x)))[1:width]), collapse = "")
 }
 
-# Extract numbers from each column name
 extract_numbers <- function(label) {
-  # Remove parentheses
+  # extract numbers from each column name
+  # remove parentheses
   nums <- gsub("[()]", "", label)
-  # Split by comma if needed
+  # split by comma
   strsplit(nums, ",")[[1]]
 }
 
-# Convert and format
 label_convert <- function(input_labels){
+  # Convert and format
   binary_labels <- sapply(input_labels, function(name) {
     nums <- extract_numbers(name)
     bin <- sapply(nums, function(n) to_binary(n))
@@ -66,10 +54,10 @@ sort_labels <- function(input_labels){
 
 generate_sector_colors <- function(dataset, input_labels){
   # function to detect the number of sectors in a binary label vector, and assign a color for plotting
-  color_options <- c("#FF0000", "#B20000",  
-                     "#c8a772", "#B08133", 
-                     "#77b763", "#4e7741", 
-                     "#a69eb5", "#413a52")
+  color_options <- c("#e0110d", "#631918", "#d18180",  
+                     "#e0810d", "#7a5020", "#f7b76d", 
+                     "#42993c", "#267021", "#75c76f",
+                     "#8d52a8", "#5d2e73", "#a577ba")
   sector_colors <- c()
   sector_order <- 1 # *2 - 1
   sector_index <- 1
@@ -81,9 +69,11 @@ generate_sector_colors <- function(dataset, input_labels){
       sector_order <- sector_order + 1
     }
     if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(dataset[i,]) == 0){ # if it is within the current interaction order and is a peak:
-      sector_colors <- c(sector_colors, color_options[[sector_order * 2]])
-    } else if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(dataset[i,]) != 0){ # else if is not a peak
-      sector_colors <- c(sector_colors, color_options[[(sector_order * 2) - 1]])
+      sector_colors <- c(sector_colors, color_options[[(sector_order * 3) - 1]])
+    } else if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(dataset[i,]) != 0 && sum(dataset[,i]) != 0){ # else if is not a peak
+      sector_colors <- c(sector_colors, color_options[[(sector_order * 3) - 2]])
+    } else if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(dataset[,i]) == 0){ # else if is a valley
+      sector_colors <- c(sector_colors, color_options[[(sector_order * 3)]])
     }
     i <- i + 1
   }
@@ -226,5 +216,3 @@ min_distance <- function(source, targets){
 }
 
 #distances(graph_from_adjacency_matrix(full_matrix), v = 1, to = c(3,7))
-custom_order <- sort_labels(input_labels)
-eco_transition_plot(z, sector_order = custom_order, plot_labels = input_labels)
