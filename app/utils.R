@@ -54,8 +54,8 @@ sort_labels <- function(input_labels){
 
 generate_sector_colors <- function(dataset, input_labels){
   # function to detect the number of sectors in a binary label vector, and assign a color for plotting
-  color_options <- c("#e0110d", "#631918", "#d18180",  
-                     "#e0810d", "#7a5020", "#f7b76d", 
+  color_options <- c("#e0110d", "#631918", "#d1818033",  
+                     "#e0810d", "#7a5020", "#f7b76d44", 
                      "#42993c", "#267021", "#75c76f",
                      "#8d52a8", "#5d2e73", "#a577ba")
   sector_colors <- c()
@@ -79,6 +79,21 @@ generate_sector_colors <- function(dataset, input_labels){
   }
   names(sector_colors) = input_labels
   return(sector_colors)
+}
+
+list_extrema <- function(dataset, input_labels){
+  peaks <- c()
+  valleys <- c()
+  for (i in 1:ncol(dataset)){
+    if (sum(dataset[i,]) == 0){ # if there are no outgoing connections
+      peaks <- c(peaks, input_labels[i])
+    } else if (sum(dataset[,i]) == 0){ # if there are no incoming connections
+      valleys <- c(valleys, input_labels[i])
+    }
+  }
+  names(peaks) = peaks
+  names(valleys) = valleys
+  return(list("peaks" = peaks, "valleys" = valleys))
 }
 
 hamming_matrix <- function(n) {

@@ -21,11 +21,7 @@ ui <- page_sidebar( # create a sidebar
       ),
       accordion_panel(
         "Highlight",
-        checkboxGroupInput(
-          inputId = "selection",
-          label = "Select nodes to visualize",
-          choices = list("000" = 0, "001" = 1)
-        )
+        uiOutput("peak_choice")
       ),
       accordion_panel(
         "Calculate Mutational Distance",
@@ -42,8 +38,7 @@ ui <- page_sidebar( # create a sidebar
           choices = list("Choice 1" = 1, "Choice 2" = 2, "Choice 3" = 3),
           selected = 2
         )
-      ),
-      position = "right"
+      )
     )
   ),
   # Output: Histogram ----
@@ -55,7 +50,7 @@ ui <- page_sidebar( # create a sidebar
     ),
     nav_panel(
       "Summary",
-      tableOutput("labels"),
+      #tableOutput("peak_choice"),
       card_footer("summary stats description here")
     ),
     nav_panel(
@@ -68,27 +63,42 @@ ui <- page_sidebar( # create a sidebar
 server <- function(input, output) {
   
   processed_data <- reactive({
-    dataset <- input$file
-    read.table(dataset$datapath, sep = " ", header = T, check.names = F) %>% 
+    req(input$file) # require a file so the whole thing doesn't break on init
+    read.table(input$file$datapath, sep = " ", header = T, check.names = F) %>% 
       as.matrix()
   })
   labels <- reactive({
+    req(processed_data())
     input_labels <- colnames(processed_data()) # creating the default label vector for later use
     names(input_labels) <- input_labels
+    input_labels
   })
   output$rawData <- renderTable({
+    req(processed_data())
     processed_data()
   })
   output$labels <- renderTable({
     labels()
   })
+  output$peak_choice <- renderUI({
+    req(labels())    
+    options <- label_convert(list_extrema(processed_data(), labels())$peaks)
+    options <- setNames(names(options), options)
+    checkboxGroupInput(inputId = "peak_choice", 
+                       label = "Select states to visualize:",
+                       choices = options,
+                       selected = options)
+  })
   output$circosPlot <- renderPlot({
+    req(processed_data(), labels())
     dataset <- processed_data()
     custom_order <- sort_labels(labels())
     rownames(dataset) <- colnames(dataset) # for now, we will only accept a matrix with identically ordered labels
-    
     eco_transition_plot(dataset, sector_order = custom_order, plot_labels = labels())
-
+  })
+  
+  observe({
+    print(label_convert(list_extrema(processed_data(), labels())$peaks))
   })
   
 }
