@@ -101,6 +101,11 @@ list_extrema <- function(dataset, input_labels){
   return(list("peaks" = peaks, "valleys" = valleys))
 }
 
+list_basin <- function(dataset, root){
+  basin <- bfs(graph_from_adjacency_matrix(dataset), root, mode = "in", unreachable = FALSE, dist = TRUE)
+  return(c(root, names(basin$dist[basin$dist > 0 ]))) # return the root and all nodes part of the basin except valleys (bc of highlighting, not necessary)
+}
+
 hamming_matrix <- function(n) {
   # Generate an adjacency matrix for a hamming space with dimension n
   nodes <- as.matrix(expand.grid(rep(list(c(0,1)), n)))
@@ -242,4 +247,4 @@ min_distance <- function(source, targets){
   return(hamdist)
 }
 
-#distances(graph_from_adjacency_matrix(full_matrix), v = 1, to = c(3,7))
+#distances((graph_from_adjacency_matrix(full_matrix))), v = 1, to = c(3,7))

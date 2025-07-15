@@ -99,8 +99,12 @@ server <- function(input, output) {
     req(processed_data(), labels())
     dataset <- processed_data()
     custom_order <- sort_labels(labels())
+    nodes_to_plot <- list()
+    for (peak in selected_peaks()){
+      nodes_to_plot <- c(nodes_to_plot, list_basin(dataset, peak))
+    }
     rownames(dataset) <- colnames(dataset) # for now, we will only accept a matrix with identically ordered labels
-      eco_transition_plot(dataset, highlighting = selected_peaks(), sector_order = custom_order, plot_labels = labels())
+      eco_transition_plot(dataset, highlighting = nodes_to_plot, sector_order = custom_order, plot_labels = labels())
   })
   
   observe({
