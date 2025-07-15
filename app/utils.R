@@ -52,28 +52,33 @@ sort_labels <- function(input_labels){
   return(sorted_labels)
 }
 
-generate_sector_colors <- function(dataset, input_labels){
+generate_sector_colors <- function(dataset, input_labels, highlighting = NULL){
   # function to detect the number of sectors in a binary label vector, and assign a color for plotting
-  color_options <- c("#e0110d", "#631918", "#d1818033",  
-                     "#e0810d", "#7a5020", "#f7b76d44", 
-                     "#42993c", "#267021", "#75c76f",
-                     "#8d52a8", "#5d2e73", "#a577ba")
+  color_options <- c("#e0110d", "#631918", "#d18180","#e0110d22",  
+                     "#e0810d", "#7a5020", "#f7b76d","#e0810d22",
+                     "#42993c", "#267021", "#75c76f","#42993c22",
+                     "#8d52a8", "#5d2e73", "#a577ba","#8d52a822")
   sector_colors <- c()
-  sector_order <- 1 # *2 - 1
+  sector_order <- 1
   sector_index <- 1
   binary_labels <- label_convert(input_labels)
+  if (is.null(highlighting) == FALSE){
+    binary_highlights <- label_convert(highlighting)
+  }
   i <- 1
   for(label in binary_labels){
     if (nchar(label) > nchar(binary_labels[[sector_index]])){ # track where the transition between interaction orders is
       sector_index <- i
       sector_order <- sector_order + 1
     }
-    if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(dataset[i,]) == 0){ # if it is within the current interaction order and is a peak:
-      sector_colors <- c(sector_colors, color_options[[(sector_order * 3) - 1]])
+    if(is.null(highlighting) == FALSE && !(label %in% binary_highlights)){ # if we pass the highlighting, set everything else to opaque
+      sector_colors <- c(sector_colors, color_options[[(sector_order * 4)]])
     } else if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(dataset[i,]) != 0 && sum(dataset[,i]) != 0){ # else if is not a peak
-      sector_colors <- c(sector_colors, color_options[[(sector_order * 3) - 2]])
+      sector_colors <- c(sector_colors, color_options[[(sector_order * 4) - 3]])
     } else if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(dataset[,i]) == 0){ # else if is a valley
-      sector_colors <- c(sector_colors, color_options[[(sector_order * 3)]])
+      sector_colors <- c(sector_colors, color_options[[(sector_order * 4) - 1]])
+    } else if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(dataset[i,]) == 0){ # if it is within the current interaction order and is a peak:
+      sector_colors <- c(sector_colors, color_options[[(sector_order * 4) - 2]])
     }
     i <- i + 1
   }
@@ -125,10 +130,16 @@ hamming_dist <- function(g1, g2) {
 
 eco_transition_plot <- function(dataset, 
                                 sorting = TRUE, 
+                                highlighting = NULL,
                                 sector_order = NULL, 
                                 plot_labels = NULL, ...){
   
-  sector_colors <- generate_sector_colors(dataset, plot_labels)
+  if(is.null(highlighting) == FALSE){
+    sector_colors <- generate_sector_colors(dataset, plot_labels, highlighting)
+    arrow_colors <- "#00000000"
+  } else {
+    sector_colors <- generate_sector_colors(dataset, plot_labels)
+  }
   if(is.null(sector_order) && sorting == FALSE){ # if no custom order is defined
     sector_order <- input_labels # Defaults to input label order
   } else if(is.null(sector_order) && sorting == TRUE){ # If no custom order but sorting desired
@@ -155,6 +166,7 @@ eco_transition_plot <- function(dataset,
                annotationTrack = "grid",
                directional = 1, 
                grid.col = sector_colors,
+               column.col = sector_colors,
                direction.type = "arrows",
                preAllocateTracks = list(
                  list(track.height = 0.05),

@@ -21,7 +21,8 @@ ui <- page_sidebar( # create a sidebar
       ),
       accordion_panel(
         "Highlight",
-        uiOutput("peak_choice")
+        uiOutput("peak_choice"),
+        actionButton("submit_highlight", "Plot")
       ),
       accordion_panel(
         "Calculate Mutational Distance",
@@ -89,16 +90,25 @@ server <- function(input, output) {
                        choices = options,
                        selected = options)
   })
+  selected_peaks <- reactiveVal(NULL) # set to null by default
+  observeEvent(input$submit_highlight, { # changes only when event is observed (button press)
+    selected_peaks(input$peak_choice)
+  })
+    
   output$circosPlot <- renderPlot({
     req(processed_data(), labels())
     dataset <- processed_data()
     custom_order <- sort_labels(labels())
     rownames(dataset) <- colnames(dataset) # for now, we will only accept a matrix with identically ordered labels
-    eco_transition_plot(dataset, sector_order = custom_order, plot_labels = labels())
+      eco_transition_plot(dataset, highlighting = selected_peaks(), sector_order = custom_order, plot_labels = labels())
   })
   
   observe({
-    print(label_convert(list_extrema(processed_data(), labels())$peaks))
+    if (is.null(selected_peaks())){
+      print("NULL")
+    } else if (!(is.null(selected_peaks()))){
+    print(selected_peaks())
+    }  
   })
   
 }
