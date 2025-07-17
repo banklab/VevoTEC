@@ -54,10 +54,10 @@ sort_labels <- function(input_labels){
 
 generate_sector_colors <- function(dataset, input_labels, highlighting = NULL){
   # function to detect the number of sectors in a binary label vector, and assign a color for plotting
-  color_options <- c("#e0110d", "#631918", "#d18180","#e0110d22",  
-                     "#e0810d", "#7a5020", "#f7b76d","#e0810d22",
-                     "#42993c", "#267021", "#75c76f","#42993c22",
-                     "#8d52a8", "#5d2e73", "#a577ba","#8d52a822")
+  color_options <- c("#f0554a", "#ba2014", "#f0554a","#e0110d11",  
+                     "#cfc197", "#a19574", "#cfc197","#e0810d11",
+                     "#42993c", "#267021", "#75c76f","#42993c11",
+                     "#8d52a8", "#5d2e73", "#a577ba","#8d52a811")
   sector_colors <- c()
   sector_order <- 1
   sector_index <- 1
@@ -76,7 +76,7 @@ generate_sector_colors <- function(dataset, input_labels, highlighting = NULL){
     } else if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(dataset[i,]) != 0 && sum(dataset[,i]) != 0){ # else if is not a peak
       sector_colors <- c(sector_colors, color_options[[(sector_order * 4) - 3]])
     } else if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(dataset[,i]) == 0){ # else if is a valley
-      sector_colors <- c(sector_colors, color_options[[(sector_order * 4) - 1]])
+     sector_colors <- c(sector_colors, color_options[[(sector_order * 4) - 1]])
     } else if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(dataset[i,]) == 0){ # if it is within the current interaction order and is a peak:
       sector_colors <- c(sector_colors, color_options[[(sector_order * 4) - 2]])
     }
@@ -103,7 +103,19 @@ list_extrema <- function(dataset, input_labels){
 
 list_basin <- function(dataset, root){
   basin <- bfs(graph_from_adjacency_matrix(dataset), root, mode = "in", unreachable = FALSE, dist = TRUE)
-  return(c(root, names(basin$dist[basin$dist > 0 ]))) # return the root and all nodes part of the basin except valleys (bc of highlighting, not necessary)
+  return(c(root, names(basin$dist[basin$dist > 0]))) # return the root and all nodes part of the basin
+}
+
+list_shortest_paths <- function(dataset, source, target){
+  data_matrix <- graph_from_adjacency_matrix(dataset)
+  V(data_matrix)$name <- colnames(dataset)
+  paths <- all_shortest_paths(data_matrix, from = source, to = target, mode = "out")$vpaths
+  if (length(paths) == 0){
+    return("0" = "No possible paths")
+  }
+  paths <- lapply(paths, function(x) as_ids(x))
+  names(paths) <- lapply(paths, function(x) paste0(label_convert(x), collapse = "→"))
+  return(paths)
 }
 
 hamming_matrix <- function(n) {
@@ -171,7 +183,7 @@ eco_transition_plot <- function(dataset,
                annotationTrack = "grid",
                directional = 1, 
                grid.col = sector_colors,
-               column.col = sector_colors,
+               row.col = sector_colors,
                direction.type = "arrows",
                preAllocateTracks = list(
                  list(track.height = 0.05),
