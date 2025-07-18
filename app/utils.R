@@ -86,6 +86,21 @@ generate_sector_colors <- function(dataset, input_labels, highlighting = NULL){
   return(sector_colors)
 }
 
+generate_link_colors <- function(dataset, input_labels, mode, highlighting = NULL){
+  color_matrix <- matrix(nrow = nrow(dataset), ncol = ncol(dataset), "#00000000")
+  color_options <- c("#f0554a", "#ba2014", "#f0554a","#e0110d11",  
+                     "#cfc197", "#a19574", "#cfc197","#e0810d11",
+                     "#42993c", "#267021", "#75c76f","#42993c11",
+                     "#8d52a8", "#5d2e73", "#a577ba","#8d52a811")
+  
+  if (mode == "basin"){ # 
+    
+  } else if (mode == "path"){
+    
+  }
+  return(color_matrix)
+}
+
 list_extrema <- function(dataset, input_labels){
   peaks <- c()
   valleys <- c()
@@ -103,7 +118,7 @@ list_extrema <- function(dataset, input_labels){
 
 list_basin <- function(dataset, root){
   basin <- bfs(graph_from_adjacency_matrix(dataset), root, mode = "in", unreachable = FALSE, dist = TRUE)
-  return(c(root, names(basin$dist[basin$dist > 0]))) # return the root and all nodes part of the basin
+  return(c(root, names(basin$dist[basin$dist > 0]))) # return the root and all nodes part of the basin (nodes not part of basin return -1)
 }
 
 list_shortest_paths <- function(dataset, source, target){
@@ -111,10 +126,11 @@ list_shortest_paths <- function(dataset, source, target){
   V(data_matrix)$name <- colnames(dataset)
   paths <- all_shortest_paths(data_matrix, from = source, to = target, mode = "out")$vpaths
   if (length(paths) == 0){
-    return("0" = "No possible paths")
+    return("No possible paths")
   }
   paths <- lapply(paths, function(x) as_ids(x))
   names(paths) <- lapply(paths, function(x) paste0(label_convert(x), collapse = "→"))
+  paths <- lapply(paths, toString) # we will have to coerce to a string here bc shiny cannot handle lists as a selectable value. we split these later
   return(paths)
 }
 

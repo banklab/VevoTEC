@@ -135,7 +135,11 @@ server <- function(input, output) {
     if (is.null(selected_peaks()) == FALSE){
       selected_peaks(NULL)
     }
-    selected_path(input$path)
+    if (input$path == "No possible paths"){
+      selected_path(NULL)
+    } else {
+      selected_path(input$path)
+    }
   })
     
   output$circosPlot <- renderPlot({
@@ -143,20 +147,23 @@ server <- function(input, output) {
     dataset <- processed_data()
     custom_order <- sort_labels(labels())
     nodes_to_plot <- list()
+    plot_title <- NULL
     if (is.null(selected_peaks()) == FALSE){
       for (peak in selected_peaks()){
         nodes_to_plot <- c(nodes_to_plot, list_basin(dataset, peak))
       }
+      plot_title <- str_glue("Basin(s) of accessibility for:\n{label_convert(selected_peaks())}")
     } else if (is.null(selected_path()) == FALSE){
-      nodes_to_plot = selected_path()
+      nodes_to_plot = strsplit(selected_path(), ", ")[[1]] # here we split the string back into a list of nodes for plotting
+      plot_title <- str_glue("Shortest path between:\n{label_convert(selected_source())} and {label_convert(selected_target())}")
     }
     rownames(dataset) <- colnames(dataset) # for now, we will only accept a matrix with identically ordered labels
-      eco_transition_plot(dataset, highlighting = nodes_to_plot, sector_order = custom_order, plot_labels = labels())
+    eco_transition_plot(dataset, highlighting = nodes_to_plot, sector_order = custom_order, plot_labels = labels())
+    title(plot_title)
   })
   
   observe({
     print(selected_path())
-    print(selected_peaks())
   })
   
 }
