@@ -94,7 +94,14 @@ generate_link_colors <- function(dataset, input_labels, mode, highlighting = NUL
                      "#8d52a8", "#5d2e73", "#a577ba","#8d52a811")
   
   if (mode == "basin"){ # 
-    
+    basin_nodes <- list_basin(dataset, highlighting)
+    for (node in basin_nodes){ # we need to select a color for all of the links flowing into these nodes, and opaque elsewhere
+      for (link in rownames(dataset)){
+        if (dataset[r,c] == 1 & node %in% basin_nodes){
+          color_matrix[link,node] <- "#0000000"
+        }
+      }  
+    }
   } else if (mode == "path"){
     
   }
