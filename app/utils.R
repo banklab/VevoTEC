@@ -103,7 +103,6 @@ generate_link_colors <- function(dataset, highlight_mode = "all", highlighting =
           } else if (sum(dataset[link,]) != 0){
             color_matrix[link, node] <- color_options[[(order * 4) - 3]] # else it must not be a peak
           }
-          #color_matrix[link,node] <- "#000000BB"
         }
       }  
     }
@@ -112,17 +111,20 @@ generate_link_colors <- function(dataset, highlight_mode = "all", highlighting =
     for (node in colnames(dataset)){ #iterate over matrix
       for (link in rownames(dataset)){
         if (dataset[link,node] == 1 & node %in% highlighting){ # if link exists and target node is in list of those to visualize:
-          order <- length(strsplit(link, ",")[[1]]) # find which interaction order based on commas in label
+          node_order <- length(strsplit(link, ",")[[1]]) # find which interaction order based on commas in label
           if (sum(dataset[link,]) == 0 && node %in% highlighting){ # if is a peak (no links out over the row, only has links in over the column)
-            color_matrix[link, node] <- color_options[[(order * 4) - 2]] # grabs peak color for the respective order
+            color_matrix[link, node] <- color_options[[(node_order * 4) - 2]] # grabs peak color for the respective order
           } else if (sum(dataset[link, ]) != 0 && node %in% highlighting){
-            color_matrix[link, node] <- color_options[[(order * 4) - 3]] # else it must not be a peak
+            color_matrix[link, node] <- color_options[[(node_order * 4) - 3]] # else it must not be a peak
           }
         }
       }  
     }
-  } else if (highlight_mode == "path"){
-    print("yay")
+  } else if (highlight_mode == "path" && is.null(highlighting) == FALSE){
+      for (i in 1:(length(highlighting)-1)){ # since this is a directed path, we simply highlight the edges between nodes in the path
+        node_order <- length(strsplit(highlighting[i], ",")[[1]])
+        color_matrix[highlighting[i], highlighting[i+1]] <- color_options[[(node_order * 4) - 3]] # none of them will be peaks, since only the last value in the path is   
+      }
   }
   return(color_matrix)
 }
@@ -147,8 +149,11 @@ generate_arrow_colors <- function(dataset, highlight_mode = "all", highlighting)
         }
       }  
     }
-  } else if (highlight_mode == "path"){
-    print("yay")
+  } else if (highlight_mode == "path" && is.null(highlighting) == FALSE){
+      for (i in 1:(length(highlighting)-1)){ # since this is a directed path, we simply highlight the edges between nodes in the path
+        node_order <- length(strsplit(highlighting[i], ","[[1]]))
+        color_matrix[highlighting[i], highlighting[i+1]] <- "#000000BB" 
+      }
   }
   return(color_matrix)
 }

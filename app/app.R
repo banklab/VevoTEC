@@ -168,7 +168,7 @@ server <- function(input, output) {
   })
   
   observe({
-    #print()
+    #print(selected_path())
   })
   
 }
