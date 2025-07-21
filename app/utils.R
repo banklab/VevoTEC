@@ -86,24 +86,69 @@ generate_sector_colors <- function(dataset, input_labels, highlighting = NULL){
   return(sector_colors)
 }
 
-generate_link_colors <- function(dataset, input_labels, mode, highlighting = NULL){
+generate_link_colors <- function(dataset, highlight_mode = "all", highlighting = NULL){
   color_matrix <- matrix(nrow = nrow(dataset), ncol = ncol(dataset), "#00000000")
-  color_options <- c("#f0554a", "#ba2014", "#f0554a","#e0110d11",  
-                     "#cfc197", "#a19574", "#cfc197","#e0810d11",
-                     "#42993c", "#267021", "#75c76f","#42993c11",
-                     "#8d52a8", "#5d2e73", "#a577ba","#8d52a811")
-  
-  if (mode == "basin"){ # 
-    basin_nodes <- list_basin(dataset, highlighting)
-    for (node in basin_nodes){ # we need to select a color for all of the links flowing into these nodes, and opaque elsewhere
+  dimnames(color_matrix) <- dimnames(dataset)
+  color_options <- c("#f0554abb", "#ba2014bb", "#f0554abb","#e0110d11",  
+                     "#cfc197bb", "#a19574bb", "#cfc197bb","#e0810d11",
+                     "#42993cbb", "#267021bb", "#42993cbb","#42993c11",
+                     "#8d52a8bb", "#5d2e73bb", "#8d52a8bb","#8d52a811")
+  if (highlight_mode == "all"){
+    for (node in colnames(dataset)){ #iterate over matrix
       for (link in rownames(dataset)){
-        if (dataset[r,c] == 1 & node %in% basin_nodes){
-          color_matrix[link,node] <- "#0000000"
+        if (dataset[link,node] == 1){ # if link exists
+          order <- length(strsplit(link, ",")[[1]]) # find which interaction order (of the source) based on commas in label
+          if (sum(dataset[link,]) == 0){ # if is a peak (no links out over the row, only has links in over the column)
+            color_matrix[link, node] <- color_options[[(order * 4) - 2]] # grabs peak color for the respective order
+          } else if (sum(dataset[link,]) != 0){
+            color_matrix[link, node] <- color_options[[(order * 4) - 3]] # else it must not be a peak
+          }
+          #color_matrix[link,node] <- "#000000BB"
         }
       }  
     }
-  } else if (mode == "path"){
-    
+  }
+  if (highlight_mode == "basin" && is.null(highlighting) == FALSE){ # double check for highlighting anyway
+    for (node in colnames(dataset)){ #iterate over matrix
+      for (link in rownames(dataset)){
+        if (dataset[link,node] == 1 & node %in% highlighting){ # if link exists and target node is in list of those to visualize:
+          order <- length(strsplit(link, ",")[[1]]) # find which interaction order based on commas in label
+          if (sum(dataset[link,]) == 0 && node %in% highlighting){ # if is a peak (no links out over the row, only has links in over the column)
+            color_matrix[link, node] <- color_options[[(order * 4) - 2]] # grabs peak color for the respective order
+          } else if (sum(dataset[link, ]) != 0 && node %in% highlighting){
+            color_matrix[link, node] <- color_options[[(order * 4) - 3]] # else it must not be a peak
+          }
+        }
+      }  
+    }
+  } else if (highlight_mode == "path"){
+    print("yay")
+  }
+  return(color_matrix)
+}
+
+generate_arrow_colors <- function(dataset, highlight_mode = "all", highlighting){
+  color_matrix <- matrix(nrow = nrow(dataset), ncol = ncol(dataset), "#00000000")
+  dimnames(color_matrix) <- dimnames(dataset)
+  if (highlight_mode == "all"){
+    for (node in colnames(dataset)){ #iterate over matrix
+      for (link in rownames(dataset)){
+        if (dataset[link,node] == 1){ # if link exists
+          color_matrix[link,node] <- "#000000BB"
+        }
+      }  
+    }
+  }
+  if (highlight_mode == "basin" && is.null(highlighting) == FALSE){ # double check for highlighting anyway
+    for (node in colnames(dataset)){ #iterate over matrix
+      for (link in rownames(dataset)){
+        if (dataset[link,node] == 1 & node %in% highlighting){ # if link exists and target node is in list of those to visualize:
+          color_matrix[link,node] <- "#000000BB"
+        }
+      }  
+    }
+  } else if (highlight_mode == "path"){
+    print("yay")
   }
   return(color_matrix)
 }
@@ -172,13 +217,17 @@ eco_transition_plot <- function(dataset,
                                 sorting = TRUE, 
                                 highlighting = NULL,
                                 sector_order = NULL, 
-                                plot_labels = NULL, ...){
-  
+                                plot_labels = NULL,
+                                highlight_mode,
+                                ...){
   if(is.null(highlighting) == FALSE){
     sector_colors <- generate_sector_colors(dataset, plot_labels, highlighting)
-    arrow_colors <- "#00000000"
-  } else {
+    link_colors <- generate_link_colors(dataset, highlight_mode, highlighting)
+    arrow_colors <- generate_arrow_colors(dataset, highlight_mode, highlighting)
+  } else if (is.null(highlighting) == TRUE){
     sector_colors <- generate_sector_colors(dataset, plot_labels)
+    link_colors <- generate_link_colors(dataset)
+    arrow_colors <- generate_arrow_colors(dataset)
   }
   if(is.null(sector_order) && sorting == FALSE){ # if no custom order is defined
     sector_order <- input_labels # Defaults to input label order
@@ -206,8 +255,9 @@ eco_transition_plot <- function(dataset,
                annotationTrack = "grid",
                directional = 1, 
                grid.col = sector_colors,
-               row.col = sector_colors,
+               col = link_colors,
                direction.type = "arrows",
+               link.arr.col = arrow_colors,
                preAllocateTracks = list(
                  list(track.height = 0.05),
                  list(track.height = 0.025),
@@ -281,5 +331,3 @@ min_distance <- function(source, targets){
   }
   return(hamdist)
 }
-
-#distances((graph_from_adjacency_matrix(full_matrix))), v = 1, to = c(3,7))

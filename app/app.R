@@ -146,24 +146,29 @@ server <- function(input, output) {
     req(processed_data(), labels())
     dataset <- processed_data()
     custom_order <- sort_labels(labels())
-    nodes_to_plot <- list()
     plot_title <- NULL
+    highlighting <- NULL
+    highlight_mode <- "all"
     if (is.null(selected_peaks()) == FALSE){
+      highlighting <- list()
       for (peak in selected_peaks()){
-        nodes_to_plot <- c(nodes_to_plot, list_basin(dataset, peak))
+        highlight_mode <- "basin"
+        highlighting <- c(highlighting, list_basin(dataset, peak))
       }
-      plot_title <- str_glue("Basin(s) of accessibility for:\n{label_convert(selected_peaks())}")
+      cleaned_title <- str_replace(paste(label_convert(selected_peaks()), collapse = " & "), "\n", " ")
+      plot_title <- str_glue("Basin(s) of accessibility for:\n{cleaned_title}")
     } else if (is.null(selected_path()) == FALSE){
-      nodes_to_plot = strsplit(selected_path(), ", ")[[1]] # here we split the string back into a list of nodes for plotting
+      highlight_mode <- "path"
+      highlighting = strsplit(selected_path(), ", ")[[1]] # here we split the string back into a list of nodes for plotting
       plot_title <- str_glue("Shortest path between:\n{label_convert(selected_source())} and {label_convert(selected_target())}")
     }
     rownames(dataset) <- colnames(dataset) # for now, we will only accept a matrix with identically ordered labels
-    eco_transition_plot(dataset, highlighting = nodes_to_plot, sector_order = custom_order, plot_labels = labels())
+    eco_transition_plot(dataset = dataset, highlighting = highlighting, sector_order = custom_order, plot_labels = labels(), highlight_mode = highlight_mode)
     title(plot_title)
   })
   
   observe({
-    print(selected_path())
+    #print()
   })
   
 }
