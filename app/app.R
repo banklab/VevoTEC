@@ -21,8 +21,8 @@ ui <- page_sidebar( # create a sidebar
         )
       ),
       accordion_panel(
-        title = h5("Highlight basin(s) of accessibility"),
-        value = "Highlight basin(s) of accessibility",
+        title = h5("Highlight adaptive basin(s)"),
+        value = "Highlight adaptive basin(s)",
         uiOutput("peak_choice"),
         actionButton("submit_highlight", "Plot")
       ),
@@ -80,7 +80,7 @@ server <- function(input, output) {
     options <- label_convert(list_extrema(processed_data(), labels())$peaks)
     options <- setNames(names(options), options)
     checkboxGroupInput(inputId = "peak_choice", 
-                       label = "Select fitness peak(s) to visualize:",
+                       label = "Select sink(s) to visualize:",
                        choices = options,
                        selected = options)
   })
@@ -100,7 +100,7 @@ server <- function(input, output) {
     options_peaks <- setNames(names(options_peaks), options_peaks)
     selectInput(
       inputId = "target_choice", 
-      label = "Select target sink (fitness maximum) state:", 
+      label = "Select target sink state:", 
       choices = options_peaks, 
       multiple = FALSE
     )
@@ -156,7 +156,7 @@ server <- function(input, output) {
         highlighting <- c(highlighting, list_basin(dataset, peak))
       }
       cleaned_title <- str_replace(paste(label_convert(selected_peaks()), collapse = " & "), "\n", " ")
-      plot_title <- str_glue("Basin(s) of accessibility for:\n{cleaned_title}")
+      plot_title <- str_glue("Adaptive basin(s) for:\n{cleaned_title}")
     } else if (is.null(selected_path()) == FALSE){
       highlight_mode <- "path"
       highlighting = strsplit(selected_path(), ", ")[[1]] # here we split the string back into a list of nodes for plotting
