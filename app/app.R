@@ -45,7 +45,8 @@ ui <- page_sidebar( # create a sidebar
     ),
     nav_panel(
       "Summary",
-      #tableOutput("peak_choice"),
+      textOutput("transitions"),
+      tableOutput("peaks"),
       card_footer("summary stats description here")
     ),
     nav_panel(
@@ -72,8 +73,14 @@ server <- function(input, output) {
     req(processed_data())
     processed_data()
   })
-  output$labels <- renderTable({
-    labels()
+  output$transitions <- renderText({
+    req(processed_data())
+    str_glue("Number of inter-order transitions: {interaction_transitions(processed_data())}")
+  })
+  output$peaks <- renderTable({
+    peaks <- list_extrema(processed_data(), labels())$peaks
+    list_basin(processed_data(), peaks[1])
+    #valleys <- list_extrema(processed_data(), labels())$valleys
   })
   output$peak_choice <- renderUI({
     req(labels())    

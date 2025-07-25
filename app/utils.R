@@ -218,6 +218,20 @@ hamming_dist <- function(g1, g2) {
   return(sum(strsplit(g1, "")[[1]] != strsplit(g2, "")[[1]]))
 }
 
+interaction_transitions <- function(dataset){
+# function to return the number of transitions between interaction orders in a dataset
+  binary_labels <- label_convert(colnames(z))
+  num_transitions <- 0
+  for (i in 1:dim(dataset)[1]){
+    for (j in 1:dim(dataset)[2]){
+      if (dataset[i,j] == 1 && length(str_split_1(binary_labels[i], "\n")) != length(str_split_1(binary_labels[j], "\n"))){
+        num_transitions <- num_transitions + 1
+      } # else if (dataset[i,j] == 1 && length(binary_labels[[j]] > length(binary_labels[[i]])))
+    }
+  }
+  return(num_transitions)
+}
+
 eco_transition_plot <- function(dataset, 
                                 sorting = TRUE, 
                                 highlighting = NULL,
