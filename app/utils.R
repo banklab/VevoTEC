@@ -2,21 +2,21 @@ library(tidyverse)
 library(circlize)
 library(igraph)
 
-# functions and code to convert to create a vector of binary labels
+# functions and code to convert to create a vector of binary labels. Only needed by label_convert()
 to_binary <- function(x, width = ceiling(log2(7))) { # should later handle whatever the largest number is
   paste0(rev(as.integer(intToBits(as.integer(x)))[1:width]), collapse = "")
 }
 
+# extract numbers from each column name, remove parentheses, split by comma. Only needed by label_convert()
 extract_numbers <- function(label) {
-  # extract numbers from each column name
-  # remove parentheses
   nums <- gsub("[()]", "", label)
-  # split by comma
   strsplit(nums, ",")[[1]]
 }
 
+# Convert and format labels from base 10 to base 2. 
+# Input: named list of format: list(`(x)` = "(x)", `(x,y)` = "(x,y)", ...)
+# Output: named list of identical format with numbers in base 2. Commas in IDs are replaced with newlines (\n)
 label_convert <- function(input_labels){
-  # Convert and format
   binary_labels <- sapply(input_labels, function(name) {
     nums <- extract_numbers(name)
     bin <- sapply(nums, function(n) to_binary(n))
@@ -25,19 +25,87 @@ label_convert <- function(input_labels){
   return(binary_labels)
 }
 
+# takes two binary strings and returns the hamming distance between them
+hamming_dist <- function(g1, g2) {
+  return(sum(strsplit(g1, "")[[1]] != strsplit(g2, "")[[1]]))
+}
+
+# Generate an adjacency matrix for a hamming space with dimension n
+hamming_matrix <- function(n) {
+  nodes <- as.matrix(expand.grid(rep(list(c(0,1)), n)))
+  num_nodes <- nrow(nodes)
+  
+  adj_matrix <- matrix(0, nrow = num_nodes, ncol = num_nodes)
+  
+  for (i in 1:(num_nodes - 1)) {
+    for (j in (i + 1):num_nodes) {
+      if (sum(nodes[i, ] != nodes[j, ]) == 1) {
+        adj_matrix[i, j] <- 1
+        adj_matrix[j, i] <- 1  # symmetric since undirected
+      }
+    }
+  }
+  
+  rownames(adj_matrix) <- apply(nodes, 1, paste0, collapse = "")
+  colnames(adj_matrix) <- rownames(adj_matrix)
+  
+  return(adj_matrix)
+}
+
+# Function to determine the min number of mutations required between two states. This may not actually be achievable on a given landscape. 
+min_distance <- function(source, targets){
+  bitwidth <- nchar(source)
+  full_network_matrix <- hamming_matrix(bitwidth) # make a general (full landscape) matrix
+  full_network_graph <- graph_from_adjacency_matrix(full_network_matrix) # convert matrix to graph
+  # find the shortest path between the source and target: if target is monotypic, take hamming dist
+  targets <- str_split_1(targets, "\n")
+  names(targets) <- targets
+  if (length(targets) == 1){
+    return(hamming_dist(source, targets))
+  } else {
+    # if target has two or more, then find the shortest combined path by:
+    # find the min hamming dist between all genotypes in state
+    min_dist_target <- "0"
+    hamdist <- Inf
+    for (target in targets){
+      if (hamming_dist(source, target) < hamdist){
+        hamdist = hamming_dist(source, target)
+        min_dist_target = target
+      }
+    }
+    targets <- targets[names(targets) != min_dist_target]
+    # calc shortest path from source to this target
+    second_source_indices <- as.vector(shortest_paths(full_network_graph, source, min_dist_target)[[1]][[1]])
+    # nodes are stored in the vector V(g)$name, which is 1 indexed. You cannot reference by names
+    second_sources <- V(full_network_graph)$name[second_source_indices]
+    # find min hamming dist between each genotype in path and the second genotype
+    second_min_dist_target <- "0"
+    second_hamdist <- Inf
+    for (second_source in second_sources){
+      if (hamming_dist(second_source, targets) < second_hamdist){
+        second_hamdist <- hamming_dist(second_source, targets)
+        second_min_dist_source <- second_source
+      }
+    }
+    # add hamming distances together
+    hamdist <- hamdist + second_hamdist
+  }
+  return(hamdist)
+}
+
+# Function to sort labels by increasing distance from 0.
 sort_labels <- function(input_labels){
-  # function to sort labels by increasing distance from 0. Otherwise the provided order is used.
   binary_labels <- label_convert(input_labels)
   distances <- sapply(binary_labels, function(x) min_distance("000", x))
   names(distances) <- input_labels
   
-  # determine which indices belong to which interaction orders
+  # Determine which indices belong to which interaction orders
   interaction_order <- c()
   sector = 1
   sector_begin <- 1
   i <- 1
   for (label in binary_labels){
-    if (nchar(label) > nchar(binary_labels[[sector_begin]])){ # track where the transition between interaction orders is
+    if (nchar(label) > nchar(binary_labels[[sector_begin]])){ # Track where the transition between interaction orders is
       sector <- sector + 1
       sector_begin <- i
     }
@@ -52,8 +120,8 @@ sort_labels <- function(input_labels){
   return(sorted_labels)
 }
 
+# Function to detect the number of sectors in a binary label vector, and create a vector of colors for the chord diagram
 generate_sector_colors <- function(dataset, input_labels, highlighting = NULL){
-  # function to detect the number of sectors in a binary label vector, and assign a color for plotting
   color_options <- c("#f0554a", "#ba2014", "#f0554a","#e0110d11",  
                      "#cfc197", "#a19574", "#cfc197","#e0810d11",
                      "#42993c", "#267021", "#75c76f","#42993c11",
@@ -86,6 +154,7 @@ generate_sector_colors <- function(dataset, input_labels, highlighting = NULL){
   return(sector_colors)
 }
 
+# Function for generating color palettes of links to use with the chord diagram
 generate_link_colors <- function(dataset, highlight_mode = "all", highlighting = NULL){
   color_matrix <- matrix(nrow = nrow(dataset), ncol = ncol(dataset), "#00000000")
   dimnames(color_matrix) <- dimnames(dataset)
@@ -94,63 +163,64 @@ generate_link_colors <- function(dataset, highlight_mode = "all", highlighting =
                      "#42993cbb", "#267021bb", "#42993cbb","#42993c11",
                      "#8d52a8bb", "#5d2e73bb", "#8d52a8bb","#8d52a811")
   if (highlight_mode == "all"){
-    for (node in colnames(dataset)){ #iterate over matrix
+    for (node in colnames(dataset)){ # Iterate over matrix
       for (link in rownames(dataset)){
-        if (dataset[link,node] == 1){ # if link exists
-          order <- length(strsplit(link, ",")[[1]]) # find which interaction order (of the source) based on commas in label
-          if (sum(dataset[link,]) == 0){ # if is a peak (no links out over the row, only has links in over the column)
-            color_matrix[link, node] <- color_options[[(order * 4) - 2]] # grabs peak color for the respective order
+        if (dataset[link,node] == 1){ # If link exists
+          order <- length(strsplit(link, ",")[[1]]) # Find which interaction order (of the source) based on commas in label
+          if (sum(dataset[link,]) == 0){ # If is a peak (no links out over the row, only has links in over the column)
+            color_matrix[link, node] <- color_options[[(order * 4) - 2]] # Grabs peak color for the respective order
           } else if (sum(dataset[link,]) != 0){
-            color_matrix[link, node] <- color_options[[(order * 4) - 3]] # else it must not be a peak
+            color_matrix[link, node] <- color_options[[(order * 4) - 3]] # Else it must not be a peak
           }
         }
       }  
     }
   }
-  if (highlight_mode == "basin" && is.null(highlighting) == FALSE){ # double check for highlighting anyway
-    for (node in colnames(dataset)){ #iterate over matrix
+  if (highlight_mode == "basin" && is.null(highlighting) == FALSE){ # Double check for highlighting anyway
+    for (node in colnames(dataset)){ # Iterate over matrix
       for (link in rownames(dataset)){
-        if (dataset[link,node] == 1 & node %in% highlighting){ # if link exists and target node is in list of those to visualize:
-          node_order <- length(strsplit(link, ",")[[1]]) # find which interaction order based on commas in label
-          if (sum(dataset[link,]) == 0 && node %in% highlighting){ # if is a peak (no links out over the row, only has links in over the column)
-            color_matrix[link, node] <- color_options[[(node_order * 4) - 2]] # grabs peak color for the respective order
+        if (dataset[link,node] == 1 & node %in% highlighting){ # If link exists and target node is in list of those to visualize:
+          node_order <- length(strsplit(link, ",")[[1]]) # Find which interaction order based on commas in label
+          if (sum(dataset[link,]) == 0 && node %in% highlighting){ # If is a peak (no links out over the row, only has links in over the column)
+            color_matrix[link, node] <- color_options[[(node_order * 4) - 2]] # Grabs peak color for the respective order
           } else if (sum(dataset[link, ]) != 0 && node %in% highlighting){
-            color_matrix[link, node] <- color_options[[(node_order * 4) - 3]] # else it must not be a peak
+            color_matrix[link, node] <- color_options[[(node_order * 4) - 3]] # Else it must not be a peak
           }
         }
       }  
     }
   } else if (highlight_mode == "path" && is.null(highlighting) == FALSE){
-      for (i in 1:(length(highlighting)-1)){ # since this is a directed path, we simply highlight the edges between nodes in the path
+      for (i in 1:(length(highlighting)-1)){ # Since this is a directed path, we simply highlight the edges between nodes in the path
         node_order <- length(strsplit(highlighting[i], ",")[[1]])
-        color_matrix[highlighting[i], highlighting[i+1]] <- color_options[[(node_order * 4) - 3]] # none of them will be peaks, since only the last value in the path is   
+        color_matrix[highlighting[i], highlighting[i+1]] <- color_options[[(node_order * 4) - 3]] # None of them will be peaks, since only the last value in the path is   
       }
   }
   return(color_matrix)
 }
 
+# Function for generating color palettes of arrows to use with the chord diagram. Opacity should correspond to which links are also highlighted
 generate_arrow_colors <- function(dataset, highlight_mode = "all", highlighting){
   color_matrix <- matrix(nrow = nrow(dataset), ncol = ncol(dataset), "#00000000")
   dimnames(color_matrix) <- dimnames(dataset)
   if (highlight_mode == "all"){
-    for (node in colnames(dataset)){ #iterate over matrix
+    for (node in colnames(dataset)){ # Iterate over matrix
       for (link in rownames(dataset)){
-        if (dataset[link,node] == 1){ # if link exists
+        if (dataset[link,node] == 1){ # If link exists
           color_matrix[link,node] <- "#000000BB"
         }
       }  
     }
   }
-  if (highlight_mode == "basin" && is.null(highlighting) == FALSE){ # double check for highlighting anyway
-    for (node in colnames(dataset)){ #iterate over matrix
+  if (highlight_mode == "basin" && is.null(highlighting) == FALSE){ # Double check for highlighting anyway
+    for (node in colnames(dataset)){ # Iterate over matrix
       for (link in rownames(dataset)){
-        if (dataset[link,node] == 1 & node %in% highlighting){ # if link exists and target node is in list of those to visualize:
+        if (dataset[link,node] == 1 & node %in% highlighting){ # If link exists and target node is in list of those to visualize:
           color_matrix[link,node] <- "#000000BB"
         }
       }  
     }
   } else if (highlight_mode == "path" && is.null(highlighting) == FALSE){
-      for (i in 1:(length(highlighting)-1)){ # since this is a directed path, we simply highlight the edges between nodes in the path
+      for (i in 1:(length(highlighting)-1)){ # Since this is a directed path, we simply highlight the edges between nodes in the path
         node_order <- length(strsplit(highlighting[i], ","[[1]]))
         color_matrix[highlighting[i], highlighting[i+1]] <- "#000000BB" 
       }
@@ -162,9 +232,9 @@ list_extrema <- function(dataset, input_labels){
   peaks <- c()
   valleys <- c()
   for (i in 1:ncol(dataset)){
-    if (sum(dataset[i,]) == 0){ # if there are no outgoing connections
+    if (sum(dataset[i,]) == 0){ # If there are no outgoing connections
       peaks <- c(peaks, input_labels[i])
-    } else if (sum(dataset[,i]) == 0){ # if there are no incoming connections
+    } else if (sum(dataset[,i]) == 0){ # If there are no incoming connections
       valleys <- c(valleys, input_labels[i])
     }
   }
@@ -175,7 +245,7 @@ list_extrema <- function(dataset, input_labels){
 
 list_basin <- function(dataset, root){
   basin <- bfs(graph_from_adjacency_matrix(dataset), root, mode = "in", unreachable = FALSE, dist = TRUE)
-  return(c(root, names(basin$dist[basin$dist > 0]))) # return the root and all nodes part of the basin (nodes not part of basin return -1)
+  return(c(root, names(basin$dist[basin$dist > 0]))) # Return the root and all nodes part of the basin (nodes not part of basin return -1)
 }
 
 list_shortest_paths <- function(dataset, source, target){
@@ -187,36 +257,10 @@ list_shortest_paths <- function(dataset, source, target){
   }
   paths <- lapply(paths, function(x) as_ids(x))
   names(paths) <- lapply(paths, function(x) paste0(label_convert(x), collapse = "→"))
-  paths <- lapply(paths, toString) # we will have to coerce to a string here bc shiny cannot handle lists as a selectable value. we split these later
+  paths <- lapply(paths, toString) # We will have to coerce to a string here bc shiny cannot handle lists as a selectable value. We split these later
   return(paths)
 }
 
-hamming_matrix <- function(n) {
-  # Generate an adjacency matrix for a hamming space with dimension n
-  nodes <- as.matrix(expand.grid(rep(list(c(0,1)), n)))
-  num_nodes <- nrow(nodes)
-  
-  adj_matrix <- matrix(0, nrow = num_nodes, ncol = num_nodes)
-  
-  for (i in 1:(num_nodes - 1)) {
-    for (j in (i + 1):num_nodes) {
-      if (sum(nodes[i, ] != nodes[j, ]) == 1) {
-        adj_matrix[i, j] <- 1
-        adj_matrix[j, i] <- 1  # symmetric since undirected
-      }
-    }
-  }
-  
-  rownames(adj_matrix) <- apply(nodes, 1, paste0, collapse = "")
-  colnames(adj_matrix) <- rownames(adj_matrix)
-  
-  return(adj_matrix)
-}
-
-hamming_dist <- function(g1, g2) {
-  # takes two binary strings and returns the hamming distance between them
-  return(sum(strsplit(g1, "")[[1]] != strsplit(g2, "")[[1]]))
-}
 
 interaction_transitions <- function(dataset){
 # function to return the number of transitions between interaction orders in a dataset
@@ -310,43 +354,3 @@ eco_transition_plot <- function(dataset,
   circos.clear()
 }
 
-min_distance <- function(source, targets){
-  # Function to determine the min number of mutations required to produce a state. this may not actually be achievable on a given landscape 
-  bitwidth <- nchar(source)
-  full_network_matrix <- hamming_matrix(bitwidth) # make a general (full landscape) matrix
-  full_network_graph <- graph_from_adjacency_matrix(full_network_matrix) # convert matrix to graph
-  # find the shortest path between the source and target: if target is monotypic, take hamming dist
-  targets <- str_split_1(targets, "\n")
-  names(targets) <- targets
-  if (length(targets) == 1){
-    return(hamming_dist(source, targets))
-  } else {
-  # if target has two or more, then find the shortest combined path by:
-  # find the min hamming dist between all genotypes in state
-    min_dist_target <- "0"
-    hamdist <- Inf
-    for (target in targets){
-      if (hamming_dist(source, target) < hamdist){
-        hamdist = hamming_dist(source, target)
-        min_dist_target = target
-      }
-    }
-    targets <- targets[names(targets) != min_dist_target]
-    # calc shortest path from source to this target
-    second_source_indices <- as.vector(shortest_paths(full_network_graph, source, min_dist_target)[[1]][[1]])
-    # nodes are stored in the vector V(g)$name, which is 1 indexed. You cannot reference by names
-    second_sources <- V(full_network_graph)$name[second_source_indices]
-    # find min hamming dist between each genotype in path and the second genotype
-    second_min_dist_target <- "0"
-    second_hamdist <- Inf
-    for (second_source in second_sources){
-      if (hamming_dist(second_source, targets) < second_hamdist){
-        second_hamdist <- hamming_dist(second_source, targets)
-        second_min_dist_source <- second_source
-      }
-    }
-    # add hamming distances together
-    hamdist <- hamdist + second_hamdist
-  }
-  return(hamdist)
-}
