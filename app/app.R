@@ -52,7 +52,7 @@ ui <- page_sidebar(
       "Summary",
       tableOutput("peaks"),
       textOutput("transitions"),
-      card_footer("Network summary descriptions for: adaptive basins & their sizes,
+      card_footer("Network summary descriptions for: \nAdaptive basins & their sizes,
                   number of transitions between states with differing numbers of interaction partners")
     ),
     nav_panel(
@@ -70,8 +70,11 @@ server <- function(input, output) {
   ##############################################################################
   processed_data <- reactive({ # Importing the uploaded data (fitness table or adjacency matrix)
     req(input$file) # Require a file so the whole thing doesn't break on init
-    read.table(input$file$datapath, sep = " ", header = T, check.names = F) %>% 
-      as.matrix()
+    if (tools::file_ext(input$file$datapath) == "csv"){
+      read.csv()
+    } else { # else assume it is already an adjacency matrix
+      read.table(input$file$datapath, sep = " ", header = T, check.names = F) %>% 
+        as.matrix()
   })
   labels <- reactive({ # Labels are propagated as a named vector in base 10
     req(processed_data())

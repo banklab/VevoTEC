@@ -2,6 +2,35 @@ library(tidyverse)
 library(circlize)
 library(igraph)
 
+set_bitwidth <- function(input){
+  paste0(rep("0", times = 3), collapse = "")
+}
+
+parse_fitness_table <- function(input_data){
+  data <- read.csv(input_data)
+  n <- ncol(data)
+  alleles <- list("0", "1") # If the provided data are not already binary we will map them to [0,1]
+  data <- data %>% 
+    mutate("ID" = do.call(paste, c(data[, 1:(n-1)], sep = "\n"))) %>% 
+    select(`fitness`, `ID`)
+  data$ID <- sapply(data$ID, function(x) gsub("\nNA", "", x)) # remove any NAs introduced
+  names(alleles) <- sort(unique(strsplit(gsub("\n", "", paste0(data$ID, collapse = "")), "")[[1]])) # ID the 2 alleles present and assign to [0,1]
+  alleles <- c(alleles, "\n" = "\n") # Add the newline back in after mapping (unreliable otherwise)
+  data$ID <- sapply(data$ID, function(x) { # Update ID column with binary alphabet
+    chars <- strsplit(x, "")[[1]]
+    paste0(alleles[chars], collapse = "")
+  })
+  return(data)
+}
+
+fitnesses_to_adjacency <- function(input_data){
+  # we first determine which transitions are possible (have hamming distance of 1)
+    # we do this by comparing the min sum of hamming distances between the two comparison possibilities e.g. a1b1+a2b2 vs a1b2 + a2b1 
+  # create list of IDs in system, and which they connect to
+  # then go down the list, and evaluate for each connection whether they have higher fitness. 
+  # if so, there is a link in the matrix, and we construct the matrix by sucessively adding rows after these evaluations.
+}
+
 # functions and code to convert to create a vector of binary labels. Only needed by label_convert()
 to_binary <- function(x, width = ceiling(log2(7))) { # should later handle whatever the largest number is
   paste0(rev(as.integer(intToBits(as.integer(x)))[1:width]), collapse = "")
@@ -25,7 +54,7 @@ label_convert <- function(input_labels){
   return(binary_labels)
 }
 
-# takes two binary strings and returns the hamming distance between them
+# takes two binary strings (e.g "000" & "010") and returns the hamming distance between them
 hamming_dist <- function(g1, g2) {
   return(sum(strsplit(g1, "")[[1]] != strsplit(g2, "")[[1]]))
 }
@@ -53,6 +82,10 @@ hamming_matrix <- function(n) {
 }
 
 # Function to determine the min number of mutations required between two states. This may not actually be achievable on a given landscape. 
+# For now, we assume the source is monotypic and the targets can be mono or polytypic
+# Input: binary string (e.g. "000") and newline separated string (e.g. "010\n111"))
+# Output: a number representing the minimum number of mutations from source to the targets
+#         (sum of all distances on a min span tree between the source and targets) 
 min_distance <- function(source, targets){
   bitwidth <- nchar(source)
   full_network_matrix <- hamming_matrix(bitwidth) # make a general (full landscape) matrix
@@ -96,7 +129,7 @@ min_distance <- function(source, targets){
 # Function to sort labels by increasing distance from 0.
 sort_labels <- function(input_labels){
   binary_labels <- label_convert(input_labels)
-  distances <- sapply(binary_labels, function(x) min_distance("000", x))
+  distances <- sapply(binary_labels, function(x) min_distance("000", x)) # Figuring out distance of everything from 0
   names(distances) <- input_labels
   
   # Determine which indices belong to which interaction orders
