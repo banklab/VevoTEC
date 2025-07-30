@@ -2,7 +2,7 @@ library(tidyverse)
 library(circlize)
 library(igraph)
 
-set_bitwidth <- function(input){
+set_bitwidth <- function(input_data){
   paste0(rep("0", times = 3), collapse = "")
 }
 
@@ -26,9 +26,26 @@ parse_fitness_table <- function(input_data){
 fitnesses_to_adjacency <- function(input_data){
   # we first determine which transitions are possible (have hamming distance of 1)
     # we do this by comparing the min sum of hamming distances between the two comparison possibilities e.g. a1b1+a2b2 vs a1b2 + a2b1 
-  # create list of IDs in system, and which they connect to
-  # then go down the list, and evaluate for each connection whether they have higher fitness. 
-  # if so, there is a link in the matrix, and we construct the matrix by sucessively adding rows after these evaluations.
+  n <- length(input_data$ID)
+  transition_matrix <- matrix(0, nrow = n, ncol = n, dimnames = list(input_data$ID, input_data$ID))
+  for (i in 1:(n-1)){ # to make pairwise comparisons between all IDs
+    for (j in 2:n){
+      state1 <- strsplit(input_data$ID[i], "\n")[[1]]
+      state2 <- strsplit(input_data$ID[j], "\n")[[1]]
+      # This section only applies if we consider comparing multiple genotypes from the different species 
+      # (as opposed to assuming all interaction partners are the same species, in which case we'd compare all permutations)
+      hamdist <- 0
+      for (l in 1:length(state1)){
+        hamdist <- hamdist + hamming_dist(state1[l], state2[l])
+      }
+      if (hamdist == 1 && input_data$fitness[i] < input_data$fitness[j]){
+        transition_matrix[i,j] <- 1
+      } else if (hamdist == 1 && input_data$fitness[i] > input_data$fitness[j]){
+        transition_matrix[j,i] <- 1
+      }
+    }
+  }
+  return(transition_matrix)
 }
 
 # functions and code to convert to create a vector of binary labels. Only needed by label_convert()
@@ -337,7 +354,7 @@ eco_transition_plot <- function(dataset,
   }
   
   # create gaps between different interaction orders
-  circos.par$gap.degree <- c(rep(1, times = 7), 15, rep(1, times = 6), 15)
+  #circos.par$gap.degree <- c(rep(1, times = 7), 15, rep(1, times = 6), 15)
   
   #calculate the starting offset such that 0 is at the bottom
   zero_num_connections <- sum(dataset[1,]) + sum(dataset[,1])

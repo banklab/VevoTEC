@@ -64,17 +64,19 @@ ui <- page_sidebar(
   )
 )
 
-server <- function(input, output) {
+server <- function(input, output){
   ##############################################################################
   # Code pertaining to the import and initialization of data + variables
   ##############################################################################
   processed_data <- reactive({ # Importing the uploaded data (fitness table or adjacency matrix)
     req(input$file) # Require a file so the whole thing doesn't break on init
     if (tools::file_ext(input$file$datapath) == "csv"){
-      read.csv()
+      parse_fitness_table(input$file$datapath) %>% 
+        fitnesses_to_adjacency()
     } else { # else assume it is already an adjacency matrix
       read.table(input$file$datapath, sep = " ", header = T, check.names = F) %>% 
         as.matrix()
+    }
   })
   labels <- reactive({ # Labels are propagated as a named vector in base 10
     req(processed_data())
