@@ -2,23 +2,31 @@ library(tidyverse)
 library(circlize)
 library(igraph)
 
-set_bitwidth <- function(input_data){
-  paste0(rep("0", times = 3), collapse = "")
+# Function to determine the bit width (number of loci) for a dataset from its labels
+# Labels must be in binary format e,g. "(00,00)", and we assume homogenous genome size.
+# Input: a column of labels from a dataset (adjacency matrix)
+set_bitwidth <- function(input_column){
+  return(nchar(extract_numbers(input_column[1])[1]))
 }
 
+# Parses an input fitness table with column format:
+# ("species1 = "00", species2 = "00",..., speciesN, fitness = <dbl>)
+# Column names are unimportant, except for the final fitness column.
+# Concatenates all provided (potentially variable numbers of) species into one ID label e.g. "(sp1,sp2,...)"
+# Returns a cleaned dataframe with columns (fitness = <dbl>, ID = <chr>)
 parse_fitness_table <- function(input_data){
   data <- read.csv(input_data)
   n <- ncol(data)
-  alleles <- list("0", "1") # If the provided data are not already binary we will map them to [0,1]
+  alleles <- list("0", "1") # If the provided data are not already, we will map them to [0,1]
   data <- data %>% 
-    mutate("ID" = do.call(paste, c(data[, 1:(n-1)], sep = "\n"))) %>% 
+    mutate("ID" = do.call(paste, c(data[, 1:(n-1)], sep = ","))) %>% # Paste together all but the last column of the dataframe
     select(`fitness`, `ID`)
-  data$ID <- sapply(data$ID, function(x) gsub("\nNA", "", x)) # remove any NAs introduced
-  names(alleles) <- sort(unique(strsplit(gsub("\n", "", paste0(data$ID, collapse = "")), "")[[1]])) # ID the 2 alleles present and assign to [0,1]
-  alleles <- c(alleles, "\n" = "\n") # Add the newline back in after mapping (unreliable otherwise)
+  data$ID <- sapply(data$ID, function(x) gsub(",NA", "", x)) # Remove any NAs introduced (they are just handled as strings?)
+  names(alleles) <- sort(unique(strsplit(gsub(",", "", paste0(data$ID, collapse = "")), "")[[1]])) # ID the 2 alleles present and assign to [0,1]
+  alleles <- c(alleles, "," = ",") # Add the comma back in after mapping (unreliable sorting otherwise)
   data$ID <- sapply(data$ID, function(x) { # Update ID column with binary alphabet
     chars <- strsplit(x, "")[[1]]
-    paste0(alleles[chars], collapse = "")
+    paste0("(", paste0(alleles[chars], collapse = ""), ")") # Coerce IDs to a single string in proper format: "(g1,g2,...)"
   })
   return(data)
 }
@@ -30,8 +38,8 @@ fitnesses_to_adjacency <- function(input_data){
   transition_matrix <- matrix(0, nrow = n, ncol = n, dimnames = list(input_data$ID, input_data$ID))
   for (i in 1:(n-1)){ # to make pairwise comparisons between all IDs
     for (j in 2:n){
-      state1 <- strsplit(input_data$ID[i], "\n")[[1]]
-      state2 <- strsplit(input_data$ID[j], "\n")[[1]]
+      state1 <- strsplit(input_data$ID[i], ",")[[1]]
+      state2 <- strsplit(input_data$ID[j], ",")[[1]]
       # This section only applies if we consider comparing multiple genotypes from the different species 
       # (as opposed to assuming all interaction partners are the same species, in which case we'd compare all permutations)
       hamdist <- 0
@@ -39,22 +47,22 @@ fitnesses_to_adjacency <- function(input_data){
         hamdist <- hamdist + hamming_dist(state1[l], state2[l])
       }
       if (hamdist == 1 && input_data$fitness[i] < input_data$fitness[j]){
-        transition_matrix[i,j] <- 1
+        transition_matrix[i,j] <- as.integer(1)
       } else if (hamdist == 1 && input_data$fitness[i] > input_data$fitness[j]){
-        transition_matrix[j,i] <- 1
+        transition_matrix[j,i] <- as.integer(1)
       }
     }
   }
   return(transition_matrix)
 }
 
-# functions and code to convert to create a vector of binary labels. Only needed by label_convert()
-to_binary <- function(x, width = ceiling(log2(7))) { # should later handle whatever the largest number is
-  paste0(rev(as.integer(intToBits(as.integer(x)))[1:width]), collapse = "")
+# Converts a single numeric string to binary given a bit width e.g. "7" & width = 3 -> "111" 
+to_binary <- function(number, width) { # should later handle whatever the largest number is
+  paste0(rev(as.integer(intToBits(as.integer(number)))[1:width]), collapse = "")
 }
 
-# extract numbers from each column name, remove parentheses, split by comma. Only needed by label_convert()
-extract_numbers <- function(label) {
+# Extract numbers from a label in format "(00,00)"; remove parentheses, split by comma.
+extract_numbers <- function(label){
   nums <- gsub("[()]", "", label)
   strsplit(nums, ",")[[1]]
 }
@@ -63,29 +71,30 @@ extract_numbers <- function(label) {
 # Input: named list of format: list(`(x)` = "(x)", `(x,y)` = "(x,y)", ...)
 # Output: named list of identical format with numbers in base 2. Commas in IDs are replaced with newlines (\n)
 label_convert <- function(input_labels){
-  binary_labels <- sapply(input_labels, function(name) {
+  width = set_bitwidth(input_labels)
+  binary_labels <- sapply(input_labels, function(name){
     nums <- extract_numbers(name)
-    bin <- sapply(nums, function(n) to_binary(n))
+    bin <- sapply(nums, function(n) to_binary(n, width = width))
     paste(bin, collapse = "\n")
   })
   return(binary_labels)
 }
 
 # takes two binary strings (e.g "000" & "010") and returns the hamming distance between them
-hamming_dist <- function(g1, g2) {
+hamming_dist <- function(g1, g2){
   return(sum(strsplit(g1, "")[[1]] != strsplit(g2, "")[[1]]))
 }
 
 # Generate an adjacency matrix for a hamming space with dimension n
-hamming_matrix <- function(n) {
+hamming_matrix <- function(n){
   nodes <- as.matrix(expand.grid(rep(list(c(0,1)), n)))
   num_nodes <- nrow(nodes)
   
   adj_matrix <- matrix(0, nrow = num_nodes, ncol = num_nodes)
   
-  for (i in 1:(num_nodes - 1)) {
+  for (i in 1:(num_nodes - 1)){
     for (j in (i + 1):num_nodes) {
-      if (sum(nodes[i, ] != nodes[j, ]) == 1) {
+      if (sum(nodes[i, ] != nodes[j, ]) == 1){
         adj_matrix[i, j] <- 1
         adj_matrix[j, i] <- 1  # symmetric since undirected
       }
@@ -100,22 +109,24 @@ hamming_matrix <- function(n) {
 
 # Function to determine the min number of mutations required between two states. This may not actually be achievable on a given landscape. 
 # For now, we assume the source is monotypic and the targets can be mono or polytypic
-# Input: binary string (e.g. "000") and newline separated string (e.g. "010\n111"))
+# Input: a single binary string (e.g. "000") and newline separated string (e.g. "010\n111"))
 # Output: a number representing the minimum number of mutations from source to the targets
-#         (sum of all distances on a min span tree between the source and targets) 
+# i.e. the sum of all distances on a min span tree between the source and targets.
+# this cannot handle more than two targets
 min_distance <- function(source, targets){
+  # This is a form of the k-min span tree problem, which is NP-hard. Probably can be generalized to 3+ species with a recursive function?
   bitwidth <- nchar(source)
   full_network_matrix <- hamming_matrix(bitwidth) # make a general (full landscape) matrix
   full_network_graph <- graph_from_adjacency_matrix(full_network_matrix) # convert matrix to graph
-  # find the shortest path between the source and target: if target is monotypic, take hamming dist
   targets <- str_split_1(targets, "\n")
   names(targets) <- targets
-  if (length(targets) == 1){
-    return(hamming_dist(source, targets))
+  # find the shortest path between the source and target: if target is monotypic, take hamming dist
+  if (length(unique(targets)) == 1){
+    return(hamming_dist(source, unique(targets)))
   } else {
     # if target has two or more, then find the shortest combined path by:
     # find the min hamming dist between all genotypes in state
-    min_dist_target <- "0"
+    min_dist_target <- "0" # Dummy value
     hamdist <- Inf
     for (target in targets){
       if (hamming_dist(source, target) < hamdist){
@@ -123,7 +134,7 @@ min_distance <- function(source, targets){
         min_dist_target = target
       }
     }
-    targets <- targets[names(targets) != min_dist_target]
+    targets <- targets[targets != min_dist_target]
     # calc shortest path from source to this target
     second_source_indices <- as.vector(shortest_paths(full_network_graph, source, min_dist_target)[[1]][[1]])
     # nodes are stored in the vector V(g)$name, which is 1 indexed. You cannot reference by names
@@ -146,7 +157,8 @@ min_distance <- function(source, targets){
 # Function to sort labels by increasing distance from 0.
 sort_labels <- function(input_labels){
   binary_labels <- label_convert(input_labels)
-  distances <- sapply(binary_labels, function(x) min_distance("000", x)) # Figuring out distance of everything from 0
+  zero <- paste0(rep("0", times = set_bitwidth(input_labels)), collapse = "") # create a 0 state with correct bit width
+  distances <- sapply(binary_labels, function(x) min_distance(zero, x)) # Figuring out distance of everything from 0
   names(distances) <- input_labels
   
   # Determine which indices belong to which interaction orders
@@ -174,8 +186,9 @@ sort_labels <- function(input_labels){
 generate_sector_colors <- function(dataset, input_labels, highlighting = NULL){
   color_options <- c("#f0554a", "#ba2014", "#f0554a","#e0110d11",  
                      "#cfc197", "#a19574", "#cfc197","#e0810d11",
-                     "#42993c", "#267021", "#75c76f","#42993c11",
-                     "#8d52a8", "#5d2e73", "#a577ba","#8d52a811")
+                     "#42993c", "#267021", "#42993c","#42993c11",
+                     "#8d52a8", "#5d2e73", "#8d52a8","#8d52a811")
+  #sector_colors <- sapply(binary_labels, function(x) )
   sector_colors <- c()
   sector_order <- 1
   sector_index <- 1
@@ -403,4 +416,3 @@ eco_transition_plot <- function(dataset,
   )
   circos.clear()
 }
-
