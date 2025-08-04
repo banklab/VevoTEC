@@ -89,9 +89,7 @@ hamming_dist <- function(g1, g2){
 hamming_matrix <- function(n){
   nodes <- as.matrix(expand.grid(rep(list(c(0,1)), n)))
   num_nodes <- nrow(nodes)
-  
   adj_matrix <- matrix(0, nrow = num_nodes, ncol = num_nodes)
-  
   for (i in 1:(num_nodes - 1)){
     for (j in (i + 1):num_nodes) {
       if (sum(nodes[i, ] != nodes[j, ]) == 1){
@@ -100,10 +98,8 @@ hamming_matrix <- function(n){
       }
     }
   }
-  
   rownames(adj_matrix) <- apply(nodes, 1, paste0, collapse = "")
   colnames(adj_matrix) <- rownames(adj_matrix)
-  
   return(adj_matrix)
 }
 
@@ -160,7 +156,6 @@ sort_labels <- function(input_labels){
   zero <- paste0(rep("0", times = set_bitwidth(input_labels)), collapse = "") # create a 0 state with correct bit width
   distances <- sapply(binary_labels, function(x) min_distance(zero, x)) # Figuring out distance of everything from 0
   names(distances) <- input_labels
-  
   # Determine which indices belong to which interaction orders
   interaction_order <- c()
   sector = 1
@@ -174,7 +169,6 @@ sort_labels <- function(input_labels){
     interaction_order <- c(interaction_order, sector)
     i <- i + 1
   }
-  
   # split 
   sorted_labels <- c(names(sort(distances[which(interaction_order == 1)], decreasing = F)), 
                      names(sort(distances[which(interaction_order == 2)], decreasing = T)))
@@ -184,6 +178,7 @@ sort_labels <- function(input_labels){
 
 # Function to detect the number of sectors in a binary label vector, and create a vector of colors for the chord diagram
 generate_sector_colors <- function(dataset, input_labels, highlighting = NULL){
+  # works with up to a four-species community
   color_options <- c("#f0554a", "#ba2014", "#f0554a","#e0110d11",  
                      "#cfc197", "#a19574", "#cfc197","#e0810d11",
                      "#42993c", "#267021", "#42993c","#42993c11",
@@ -254,8 +249,8 @@ generate_link_colors <- function(dataset, highlight_mode = "all", highlighting =
     }
   } else if (highlight_mode == "path" && is.null(highlighting) == FALSE){
       for (i in 1:(length(highlighting)-1)){ # Since this is a directed path, we simply highlight the edges between nodes in the path
-        node_order <- length(strsplit(highlighting[i], ",")[[1]])
-        color_matrix[highlighting[i], highlighting[i+1]] <- color_options[[(node_order * 4) - 3]] # None of them will be peaks, since only the last value in the path is   
+        node_order <- length(strsplit(highlighting[[i]], ",")[[1]])
+        color_matrix[highlighting[[i]], highlighting[[i+1]]] <- color_options[[(node_order * 4) - 3]] # None of them will be peaks, since only the last value in the path is   
       }
   }
   return(color_matrix)
@@ -284,8 +279,8 @@ generate_arrow_colors <- function(dataset, highlight_mode = "all", highlighting)
     }
   } else if (highlight_mode == "path" && is.null(highlighting) == FALSE){
       for (i in 1:(length(highlighting)-1)){ # Since this is a directed path, we simply highlight the edges between nodes in the path
-        node_order <- length(strsplit(highlighting[i], ","[[1]]))
-        color_matrix[highlighting[i], highlighting[i+1]] <- "#000000BB" 
+        node_order <- length(strsplit(highlighting[[i]], ",")[[1]])
+        color_matrix[highlighting[[i]], highlighting[[i+1]]] <- "#000000BB" 
       }
   }
   return(color_matrix)
@@ -361,14 +356,14 @@ eco_transition_plot <- function(dataset,
     arrow_colors <- generate_arrow_colors(dataset)
   }
   if(is.null(sector_order) && sorting == FALSE){ # if no custom order is defined
-    sector_order <- input_labels # Defaults to input label order
+    sector_order <- plot_labels # Defaults to input label order
   } else if(is.null(sector_order) && sorting == TRUE){ # If no custom order but sorting desired
     sector_order <- sort_labels(input_labels)
   } # else will provide custom sector order
   if (is.null(plot_labels)){ # if custom labels are not provided, copy from sector_order
     plot_labels <- sector_order
   } else {
-    plot_labels <- label_convert(plot_labels) # assuming the provided labels are in base 10, we convert to binary
+    plot_labels <- label_convert(plot_labels)
   }
   
   # create gaps between different interaction orders

@@ -95,7 +95,7 @@ server <- function(input, output){
     )
     return(mat)
   })
-  labels <- reactive({ # Labels are propagated as a named vector in base 10
+  labels <- reactive({ # Labels are propagated as a named vector
     req(processed_data())
     input_labels <- colnames(processed_data()) # Creating the default label vector for later use
     names(input_labels) <- input_labels
