@@ -324,19 +324,24 @@ list_shortest_paths <- function(dataset, source, target){
   return(paths)
 }
 
-
 interaction_transitions <- function(dataset){
 # function to return the number of transitions between interaction orders in a dataset
-  binary_labels <- label_convert(colnames(z))
-  num_transitions <- 0
-  for (i in 1:dim(dataset)[1]){
-    for (j in 1:dim(dataset)[2]){
-      if (dataset[i,j] == 1 && length(str_split_1(binary_labels[i], "\n")) != length(str_split_1(binary_labels[j], "\n"))){
-        num_transitions <- num_transitions + 1
-      } # else if (dataset[i,j] == 1 && length(binary_labels[[j]] > length(binary_labels[[i]])))
+  binary_labels <- label_convert(colnames(dataset))
+  total_transitions <- sum(dataset)
+  num_transitions_plus <- 0
+  num_transitions_minus <- 0
+  for (i in 1:ncol(dataset)){
+    for (j in 1:nrow(dataset)){
+      if (dataset[i,j] == 1 && length(str_split_1(binary_labels[i], "\n")) > length(str_split_1(binary_labels[j], "\n"))){
+        num_transitions_plus <- num_transitions_plus + 1
+      } else if (dataset[i,j] == 1 && length(str_split_1(binary_labels[i], "\n")) < length(str_split_1(binary_labels[j], "\n"))){
+        num_transitions_minus <- num_transitions_minus + 1
+      }
     }
   }
-  return(num_transitions)
+  return(list(`total` = total_transitions,
+              `increasing` = num_transitions_plus,
+              `decreasing` = num_transitions_minus))
 }
 
 eco_transition_plot <- function(dataset, 

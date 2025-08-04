@@ -11,6 +11,7 @@ ui <- page_sidebar(
   ##############################################################################
   # Sidebar panel for uploading data and highlighting functions
   ##############################################################################
+  
   sidebar = sidebar(
     accordion(
       accordion_panel(
@@ -25,7 +26,7 @@ ui <- page_sidebar(
       accordion_panel(
         title = h5("Highlight adaptive basin(s)"),
         value = "Highlight adaptive basin(s)",
-        uiOutput("peak_choice"),
+        uiOutput("Peak"),
         actionButton("submit_highlight", "Plot")
       ),
       accordion_panel(
@@ -42,18 +43,21 @@ ui <- page_sidebar(
   ##############################################################################
   # Output panels: circos plot, summary tables, raw data
   ##############################################################################
+  
   navset_card_underline(
     nav_panel(
       "Plot",
       plotOutput(outputId = "circosPlot"),
-      card_footer("plot description here")
+      card_footer("Circular plot representing preferred transitions between ecological communities. 
+                  Different colors (e.g. red, brown) represent different numbers of species in the community,
+                  while a darker sector shade represents a peak on the landscape.")
     ),
     nav_panel(
       "Summary",
       tableOutput("peaks"),
-      textOutput("transitions"),
-      card_footer("Network summary descriptions for: \nAdaptive basins & their sizes,
-                  number of transitions between states with differing numbers of interaction partners")
+      tableOutput("transitions"),
+      card_footer("Network summary descriptions for: Adaptive basins & their sizes,
+                  number of transitions between states with differing numbers of interaction partners.")
     ),
     nav_panel(
       "Raw Data",
@@ -65,18 +69,31 @@ ui <- page_sidebar(
 )
 
 server <- function(input, output){
+  
   ##############################################################################
   # Code pertaining to the import and initialization of data + variables
   ##############################################################################
+  
   processed_data <- reactive({ # Importing the uploaded data (fitness table or adjacency matrix)
     req(input$file) # Require a file so the whole thing doesn't break on init
     if (tools::file_ext(input$file$datapath) == "csv"){
-      parse_fitness_table(input$file$datapath) %>% 
+      mat <- tryCatch({
+        parse_fitness_table(input$file$datapath) %>% 
         fitnesses_to_adjacency()
+      }, error = function(e){
+        NULL
+      })
+      err <- "Please ensure that genotypes in your uploaded data have transitions of hamming distance 1."
     } else { # else assume it is already an adjacency matrix
-      read.table(input$file$datapath, sep = " ", header = T, check.names = F) %>% 
+      mat <- read.table(input$file$datapath, sep = " ", header = T, check.names = F) %>% 
         as.matrix()
+      err <- "Please ensure that your uploaded data is not a zero matrix."
     }
+    validate( # Enforce that the processed data have transitions in them
+      need(!is.null(mat), "Please ensure your alphabet size is 2 (binary)."),
+      need(sum(mat) != 0, paste("No transitions found in matrix!", err)),  
+    )
+    return(mat)
   })
   labels <- reactive({ # Labels are propagated as a named vector in base 10
     req(processed_data())
@@ -87,31 +104,36 @@ server <- function(input, output){
   output$rawData <- renderTable({ # For the displaying of the raw adjacency matrix to the user
     req(processed_data())
     processed_data()
-  })
+  }, digits = 0)
   
   ##############################################################################
   # Code pertaining to stats displayed in the Summary pane
   ##############################################################################
-  output$transitions <- renderText({ 
-    req(processed_data())
-    str_glue("Number of inter-order transitions: {interaction_transitions(processed_data())}")
-  })
+  
   output$peaks <- renderTable({ # Table listing basins and sizes
     peaks <- list_extrema(processed_data(), labels())$peaks
     basins <- lapply(peaks, function(x) list_basin(processed_data(), x)) %>% sapply(function(x) toString(label_convert(x[-1])))
     size <- sapply(basins, function(x) length(str_split(x, ",")[[1]]))
     data.frame("Peak" = label_convert(peaks), "Basin" = basins, "Size" = size)
-  })
+  }, striped = TRUE)
+  output$transitions <- renderTable({ # Table describing the different kinds of transitions
+    req(processed_data())
+    data.frame("Transitions" = c("Total transitions", "Increasing species diversity", "Decreasing species diversity"), 
+               "number" = unlist(interaction_transitions(processed_data())))
+  }, striped = TRUE,
+  colnames = FALSE,
+  digits = 0)
   
   ##############################################################################
   # Code pertaining to the Adaptive Basins widget
   ##############################################################################
-  output$peak_choice <- renderUI({ # Reactive UI element to calculate and display possible peaks to select
+  
+  output$Peak <- renderUI({ # Reactive UI element to calculate and display possible peaks to select
     req(labels())    
     options <- label_convert(list_extrema(processed_data(), labels())$peaks)
     options <- setNames(names(options), options)
     checkboxGroupInput(inputId = "peak_choice", 
-                       label = "Select sink(s) to visualize:",
+                       label = "Select peak:",
                        choices = options,
                        selected = options)
   })
@@ -126,23 +148,24 @@ server <- function(input, output){
   ##############################################################################
   # Code pertaining to the Shortest Paths widget
   ##############################################################################
+  
   output$source_choice <- renderUI({ # reactive UI element to display a list of all source states (non-peaks) 
     options_valleys <- label_convert(labels()[!(labels() %in% list_extrema(processed_data(), labels())$peaks)])
     options_valleys <- setNames(names(options_valleys), options_valleys)
     selectInput(
       inputId = "source_choice", 
-      label = "Select source state:",
+      label = "Select source:",
       choices = options_valleys,
       multiple = FALSE
     )
   })
-  output$target_choice <- renderUI({ # Reactive UI element to display all possible sinks (peaks)
+  output$target_choice <- renderUI({ # Reactive UI element to display all possible peaks
     req(labels())
     options_peaks <- label_convert(list_extrema(processed_data(), labels())$peaks)
     options_peaks <- setNames(names(options_peaks), options_peaks)
     selectInput(
       inputId = "target_choice", 
-      label = "Select target sink state:", 
+      label = "Select target peak:", 
       choices = options_peaks, 
       multiple = FALSE
     )
@@ -179,6 +202,7 @@ server <- function(input, output){
   ##############################################################################
   # Rendering of the main Circos plot, based on which widgets are used
   ##############################################################################
+  
   output$circosPlot <- renderPlot({
     req(processed_data(), labels())
     dataset <- processed_data()
