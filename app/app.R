@@ -21,7 +21,8 @@ ui <- page_sidebar(
           inputId = "file",
           label = "Select a File:", 
           multiple = FALSE
-        )
+        ),
+        checkboxInput("sorting", "Sort by input label order", TRUE)
       ),
       accordion_panel(
         title = h5("Highlight adaptive basin(s)"),
@@ -204,9 +205,13 @@ server <- function(input, output){
   ##############################################################################
   
   output$circosPlot <- renderPlot({
-    req(processed_data(), labels())
+    req(processed_data(), labels()) 
     dataset <- processed_data()
-    custom_order <- sort_labels(labels())
+    if (input$sorting == TRUE){ # Do we order the labels in the plot by distance from wt, or from the order of the header?
+      custom_order <- labels()
+    } else {
+      custom_order <- sort_labels(labels())
+    }
     plot_title <- NULL
     highlighting <- NULL
     highlight_mode <- "all" # By default, we visualize everything in the plot

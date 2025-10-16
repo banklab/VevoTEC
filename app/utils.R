@@ -2,18 +2,44 @@ library(tidyverse)
 library(circlize)
 library(igraph)
 
-# Function to determine the bit width (number of loci) for a dataset from its labels
-# Labels must be in binary format e,g. "(00,00)", and we assume homogenous genome size.
-# Input: a column of labels from a dataset (adjacency matrix)
+#' Determine the bit width of a dataset
+#'
+#' Determines the bit width (number of loci) from a dataset’s labels.
+#' Labels must be in binary format, e.g. "(00,00)", and genome size is assumed homogeneous.
+#'
+#' @param input_column A character vector of binary labels from the dataset (e.g. from an adjacency matrix).
+#'
+#' @return An integer representing the bit width (number of bits per locus).
+#'
+#' @examples
+#' labels <- c("(00,00)", "(11,11)")
+#' set_bitwidth(labels)
 set_bitwidth <- function(input_column){
   return(nchar(extract_numbers(input_column[1])[1]))
 }
 
-# Parses an input fitness table with column format:
-# ("species1 = "00", species2 = "00",..., speciesN, fitness = <dbl>)
-# Column names are unimportant, except for the final fitness column.
-# Concatenates all provided (potentially variable numbers of) species into one ID label e.g. "(sp1,sp2,...)"
-# Returns a cleaned dataframe with columns (fitness = <dbl>, ID = <chr>)
+#' Parse an input fitness table
+#'
+#' Reads and cleans a CSV file of fitness values and species genotype combinations.
+#' Concatenates all genotype columns into a single binary ID column.
+#' 
+#' Input columns: ("species1 = "00", species2 = "00",..., speciesN, fitness = <dbl>)
+#' Column names for species are unimportant, except for the final 'fitness' column.
+#' Concatenates all provided (potentially variable numbers of) species into one ID label e.g. "(sp1,sp2,...)"
+#' 
+#' @param input_data File path to the input CSV with columns for species and a final column `fitness`.
+#'
+#' @return A data frame with columns:
+#' \describe{
+#'   \item{fitness}{Numeric fitness values.}
+#'   \item{ID}{Binary string label of concatenated genotypes, e.g. "(00,11)".}
+#' }
+#'
+#' @examples
+#' \dontrun{
+#' df <- parse_fitness_table("data/fitness.csv")
+#' head(df)
+#' }
 parse_fitness_table <- function(input_data){
   data <- read.csv(input_data)
   n <- ncol(data)
@@ -31,6 +57,23 @@ parse_fitness_table <- function(input_data){
   return(data)
 }
 
+#' Create an adjacency matrix from a dataframe of fitnesses
+#'
+#' Builds a directed adjacency matrix of fitness-increasing transitions between ecological states.
+#' Two states are connected if they differ by one locus (Hamming distance = 1),
+#' with edges directed from lower to higher fitness.
+#'
+#' @param input_data A data frame with columns `ID` and `fitness`, e.g. from `parse_fitness_table()`.
+#'
+#' @return A square adjacency matrix (`matrix`) with row and column names corresponding to state IDs.
+#' Entries are `1` for fitness-increasing transitions, `0` otherwise.
+#'
+#' @examples
+#' data <- data.frame(
+#'   ID = c("(00)", "(01)", "(11)"),
+#'   fitness = c(0.1, 0.2, 0.3)
+#' )
+#' fitnesses_to_adjacency(data)
 fitnesses_to_adjacency <- function(input_data){
   # we first determine which transitions are possible (have hamming distance of 1)
     # we do this by comparing the min sum of hamming distances between the two comparison possibilities e.g. a1b1+a2b2 vs a1b2 + a2b1 
@@ -56,20 +99,49 @@ fitnesses_to_adjacency <- function(input_data){
   return(transition_matrix)
 }
 
-# Converts a single numeric string to binary given a bit width e.g. "7" & width = 3 -> "111" 
+#' Convert decimal to binary string
+#'
+#' Converts an integer to a binary string with fixed bit width.
+#'
+#' @param number Numeric or character scalar representing the decimal number.
+#' @param width Integer specifying the number of bits.
+#'
+#' @return A binary string of length `width`.
+#'
+#' @examples
+#' to_binary(7, width = 3)
+#' to_binary(2, width = 4)
 to_binary <- function(number, width) { # should later handle whatever the largest number is
   paste0(rev(as.integer(intToBits(as.integer(number)))[1:width]), collapse = "")
 }
 
-# Extract numbers from a label in format "(00,00)"; remove parentheses, split by comma.
+#' Extract numeric components from a label
+#'
+#' Parses a label in the form "(00,01)" into its component genotypes.
+#'
+#' @param label Character string label in format "(g1,g2,...)"
+#'
+#' @return A character vector of genotype strings, e.g. c("00", "01").
+#'
+#' @examples
+#' extract_numbers("(01,10)")
 extract_numbers <- function(label){
   nums <- gsub("[()]", "", label)
   strsplit(nums, ",")[[1]]
 }
 
-# Convert and format labels from base 10 to base 2. 
-# Input: named list of format: list(`(x)` = "(x)", `(x,y)` = "(x,y)", ...)
-# Output: named list of identical format with numbers in base 2. Commas in IDs are replaced with newlines (\n)
+#' Convert and format a set of labels from decimal to binary
+#'
+#' Converts all numeric values in a label list to binary form with the appropriate bit width.
+#' Commas separating genotypes are replaced by newlines.
+#'
+#' @param input_labels Named list of character labels, e.g. list("(1)"="(1)", "(1,2)"="(1,2)").
+#'
+#' @return A named list with identical structure but containing binary representations.
+#'
+#' @examples
+#' labels <- list("(1)"="(1)", "(1,2)"="(1,2)")
+#' label_convert(labels)
 label_convert <- function(input_labels){
   width = set_bitwidth(input_labels)
   binary_labels <- sapply(input_labels, function(name){
@@ -80,12 +152,30 @@ label_convert <- function(input_labels){
   return(binary_labels)
 }
 
-# takes two binary strings (e.g "000" & "010") and returns the hamming distance between them
+#' Calculate Hamming distance between two binary strings
+#'
+#' @param g1 Character string, binary (e.g. "010").
+#' @param g2 Character string, binary (e.g. "000").
+#'
+#' @return Integer number of differing bits between `g1` and `g2`.
+#'
+#' @examples
+#' hamming_dist("000", "010")
 hamming_dist <- function(g1, g2){
   return(sum(strsplit(g1, "")[[1]] != strsplit(g2, "")[[1]]))
 }
 
-# Generate an adjacency matrix for a hamming space with dimension n
+#' Generate adjacency matrix for n-dimensional Hamming space
+#'
+#' Creates a symmetric adjacency matrix where nodes represent binary strings,
+#' and edges connect nodes differing by one bit.
+#'
+#' @param n Integer, number of bits (Hamming space dimension).
+#'
+#' @return A binary adjacency matrix with row/column names as binary strings.
+#'
+#' @examples
+#' hamming_matrix(3)
 hamming_matrix <- function(n){
   nodes <- as.matrix(expand.grid(rep(list(c(0,1)), n)))
   num_nodes <- nrow(nodes)
@@ -103,12 +193,19 @@ hamming_matrix <- function(n){
   return(adj_matrix)
 }
 
-# Function to determine the min number of mutations required between two states. This may not actually be achievable on a given landscape. 
-# For now, we assume the source is monotypic and the targets can be mono or polytypic
-# Input: a single binary string (e.g. "000") and newline separated string (e.g. "010\n111"))
-# Output: a number representing the minimum number of mutations from source to the targets
-# i.e. the sum of all distances on a min span tree between the source and targets.
-# this cannot handle more than two targets
+#' Minimum number of mutations between two states
+#'
+#' Calculates the minimum number of mutations required to connect a source genotype
+#' to one or more target genotypes, via the shortest path in Hamming space.
+#'
+#' @param source Character string, binary source genotype (e.g. "000").
+#' @param targets Character string of one or more target genotypes separated by newlines.
+#'
+#' @return Integer representing the minimal number of mutational steps.
+#'
+#' @examples
+#' min_distance("000", "010")       # 1
+#' min_distance("000", "010\n111")  # >1
 min_distance <- function(source, targets){
   # This is a form of the k-min span tree problem, which is NP-hard. Probably can be generalized to 3+ species with a recursive function?
   bitwidth <- nchar(source)
@@ -150,7 +247,17 @@ min_distance <- function(source, targets){
   return(hamdist)
 }
 
-# Function to sort labels by increasing distance from 0.
+#' Sort binary labels by genetic distance
+#'
+#' Sorts a set of labels by increasing Hamming distance from the all-zero state.
+#'
+#' @param input_labels Character vector or named list of binary labels.
+#'
+#' @return A character vector of labels sorted by increasing genetic distance.
+#'
+#' @examples
+#' labels <- c("(00)", "(01)", "(11)")
+#' sort_labels(labels)
 sort_labels <- function(input_labels){
   binary_labels <- label_convert(input_labels)
   zero <- paste0(rep("0", times = set_bitwidth(input_labels)), collapse = "") # create a 0 state with correct bit width
@@ -176,7 +283,21 @@ sort_labels <- function(input_labels){
   return(sorted_labels)
 }
 
-# Function to detect the number of sectors in a binary label vector, and create a vector of colors for the chord diagram
+#' Generate colors for circos plot sectors
+#'
+#' Assigns consistent color palettes to sectors in a circos plot based on interaction order,
+#' with optional highlighting.
+#'
+#' @param dataset Adjacency matrix of transitions.
+#' @param input_labels Character vector of labels for sectors.
+#' @param highlighting Optional subset of labels to highlight.
+#'
+#' @return Named character vector of color hex codes for each sector.
+#'
+#' @examples
+#' dataset <- data.frame(ID = c("(00)", "(01)", "(11)"), fitness = c(0.1, 0.2, 0.3)) %>% 
+#'   fitnesses_to_adjacency()
+#' generate_sector_colors(dataset, colnames(dataset))
 generate_sector_colors <- function(dataset, input_labels, highlighting = NULL){
   # works with up to a four-species community
   color_options <- c("#f0554a", "#ba2014", "#f0554a","#e0110d11",  
@@ -193,18 +314,15 @@ generate_sector_colors <- function(dataset, input_labels, highlighting = NULL){
   }
   i <- 1
   for(label in binary_labels){
-    if (nchar(label) > nchar(binary_labels[[sector_index]])){ # track where the transition between interaction orders is
-      sector_index <- i
-      sector_order <- sector_order + 1
-    }
+    order <- length(strsplit(label, "\n")[[1]]) # Find which interaction order (of the source) based on commas in label
     if(is.null(highlighting) == FALSE && !(label %in% binary_highlights)){ # if we pass the highlighting, set everything else to opaque
-      sector_colors <- c(sector_colors, color_options[[(sector_order * 4)]])
-    } else if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(dataset[i,]) != 0 && sum(dataset[,i]) != 0){ # else if is not a peak
-      sector_colors <- c(sector_colors, color_options[[(sector_order * 4) - 3]])
-    } else if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(dataset[,i]) == 0){ # else if is a valley
-     sector_colors <- c(sector_colors, color_options[[(sector_order * 4) - 1]])
-    } else if(nchar(label) == nchar(binary_labels[[sector_index]]) && sum(dataset[i,]) == 0){ # if it is within the current interaction order and is a peak:
-      sector_colors <- c(sector_colors, color_options[[(sector_order * 4) - 2]])
+      sector_colors <- c(sector_colors, color_options[[(order * 4)]])
+    } else if(sum(dataset[i,]) != 0 && sum(dataset[,i]) != 0){ # else if is not a peak
+      sector_colors <- c(sector_colors, color_options[[(order * 4) - 3]])
+    } else if(sum(dataset[,i]) == 0){ # else if is a valley
+     sector_colors <- c(sector_colors, color_options[[(order * 4) - 1]])
+    } else if(sum(dataset[i,]) == 0){ # if it is a peak:
+      sector_colors <- c(sector_colors, color_options[[(order * 4) - 2]])
     }
     i <- i + 1
   }
@@ -212,7 +330,20 @@ generate_sector_colors <- function(dataset, input_labels, highlighting = NULL){
   return(sector_colors)
 }
 
-# Function for generating color palettes of links to use with the chord diagram
+#' Generate link colors for circos plot
+#'
+#' Creates a color matrix mapping transition edges to colors for a chord diagram.
+#'
+#' @param dataset Adjacency matrix of transitions.
+#' @param highlight_mode Character; one of `"all"`, `"basin"`, or `"path"`.
+#' @param highlighting Optional character vector of node labels to emphasize.
+#'
+#' @return A character matrix of color hex codes corresponding to adjacency matrix positions.
+#'
+#' @examples
+#' dataset <- data.frame(ID = c("(00)", "(01)", "(11)"), fitness = c(0.1, 0.2, 0.3)) %>% 
+#'   fitnesses_to_adjacency()
+#' generate_link_colors(dataset, "all")
 generate_link_colors <- function(dataset, highlight_mode = "all", highlighting = NULL){
   color_matrix <- matrix(nrow = nrow(dataset), ncol = ncol(dataset), "#00000000")
   dimnames(color_matrix) <- dimnames(dataset)
@@ -256,7 +387,21 @@ generate_link_colors <- function(dataset, highlight_mode = "all", highlighting =
   return(color_matrix)
 }
 
-# Function for generating color palettes of arrows to use with the chord diagram. Opacity should correspond to which links are also highlighted
+#' Generate arrow colors for circos plot
+#'
+#' Produces an opacity-coded color matrix for directional arrows in chord diagrams.
+#'
+#' @param dataset Adjacency matrix of transitions.
+#' @param highlight_mode Character; one of `"all"`, `"basin"`, or `"path"`.
+#' @param highlighting Vector of labels to emphasize.
+#'
+#' @return Character matrix of color codes (e.g. "#000000BB" for visible arrows).
+#'
+#' @examples
+#' dataset <- data.frame(ID = c("(00)", "(01)", "(11)"), fitness = c(0.1, 0.2, 0.3)) %>% 
+#'   fitnesses_to_adjacency()
+#' generate_arrow_colors(dataset, "all")
+#' generate_arrow_colors(dataset, "basin", highlighting = "(01)")
 generate_arrow_colors <- function(dataset, highlight_mode = "all", highlighting){
   color_matrix <- matrix(nrow = nrow(dataset), ncol = ncol(dataset), "#00000000")
   dimnames(color_matrix) <- dimnames(dataset)
@@ -286,6 +431,21 @@ generate_arrow_colors <- function(dataset, highlight_mode = "all", highlighting)
   return(color_matrix)
 }
 
+#' Identify peaks and valleys in fitness landscape
+#'
+#' Returns lists of local maxima (peaks) and minima (valleys) based on an adjacency matrix.
+#'
+#' @param dataset Adjacency matrix of transitions.
+#' @param input_labels Vector of corresponding node labels.
+#'
+#' @return A list with two named elements:
+#' - `peaks`: labels with no outgoing edges.
+#' - `valleys`: labels with no incoming edges.
+#'
+#' @examples
+#' dataset <- data.frame(ID = c("(00)", "(01)", "(11)"), fitness = c(0.1, 0.2, 0.3)) %>% 
+#'   fitnesses_to_adjacency()
+#' list_extrema(dataset, colnames(dataset))
 list_extrema <- function(dataset, input_labels){
   peaks <- c()
   valleys <- c()
@@ -301,11 +461,39 @@ list_extrema <- function(dataset, input_labels){
   return(list("peaks" = peaks, "valleys" = valleys))
 }
 
+#' List all states within a basin of accessibility
+#'
+#' Traverses graph to find all nodes reachable from a given root.
+#'
+#' @param dataset Adjacency matrix of transitions.
+#' @param root Character string; label of the root node.
+#'
+#' @return Character vector of labels in the same basin as the root.
+#'
+#' @examples
+#' dataset <- data.frame(ID = c("(00)", "(01)", "(11)"), fitness = c(0.1, 0.2, 0.3)) %>% 
+#'   fitnesses_to_adjacency()
+#' list_basin(dataset, "(11)")
 list_basin <- function(dataset, root){
   basin <- bfs(graph_from_adjacency_matrix(dataset), root, mode = "in", unreachable = FALSE, dist = TRUE)
   return(c(root, names(basin$dist[basin$dist > 0]))) # Return the root and all nodes part of the basin (nodes not part of basin return -1)
 }
 
+#' Find shortest paths between two states
+#'
+#' Computes all shortest directed paths between two nodes in the transition network.
+#'
+#' @param dataset Adjacency matrix.
+#' @param source Character string giving starting node label.
+#' @param target Character string giving target node label.
+#'
+#' @return A list of shortest paths (as strings with arrows between labels), or
+#' `"No possible paths"` if none exist.
+#'
+#' @examples
+#' dataset <- data.frame(ID = c("(00)", "(01)", "(11)"), fitness = c(0.1, 0.2, 0.3)) %>% 
+#'   fitnesses_to_adjacency()
+#' list_shortest_paths(dataset, "(00)", "(11)")
 list_shortest_paths <- function(dataset, source, target){
   data_matrix <- graph_from_adjacency_matrix(dataset)
   V(data_matrix)$name <- colnames(dataset)
@@ -319,6 +507,22 @@ list_shortest_paths <- function(dataset, source, target){
   return(paths)
 }
 
+#' Calculate the number of transitions that change community diversity
+#'
+#' Different ecological states may have different numbers of species in them. 
+#' This function sums the number of mutations in the system that cause gain or loss of community diversity.
+#'
+#' @param dataset Adjacency matrix
+#' 
+#' @returns A list with three named elements: 
+#' - `total`: Number of transitions in the dataset
+#' - `increasing`: Of which the number of species increases
+#' - `decreasing`: Of which the number of species decreases
+#' 
+#' @examples
+#' dataset <- data.frame(ID = c("(00)", "(01)", "(11)"), fitness = c(0.1, 0.2, 0.3)) %>% 
+#'   fitnesses_to_adjacency()
+#' interaction_transitions(dataset)
 interaction_transitions <- function(dataset){
 # function to return the number of transitions between interaction orders in a dataset
   binary_labels <- label_convert(colnames(dataset))
@@ -339,6 +543,28 @@ interaction_transitions <- function(dataset){
               `decreasing` = num_transitions_minus))
 }
 
+#' Generate ecological transition circos plot
+#'
+#' Visualizes fitness-increasing transitions between ecological states using a circos chord diagram.
+#'
+#' @details
+#' Combines adjacency data, sector sorting, and color schemes to produce a
+#' directed network visualization of evolutionary and ecological transitions.
+#'
+#' @param dataset Adjacency matrix of transitions.
+#' @param sorting Logical; whether to automatically sort sectors.
+#' @param highlighting Optional vector of nodes to highlight.
+#' @param sector_order Optional custom order of sectors.
+#' @param plot_labels Optional custom label vector.
+#' @param highlight_mode Character; one of `"all"`, `"basin"`, or `"path"`.
+#' @param ... Additional arguments passed to `circlize::chordDiagram()`.
+#'
+#' @return A circos plot rendered to the active graphical device.
+#'
+#' @examples
+#' \dontrun{
+#' eco_transition_plot(dataset, highlight_mode = "all")
+#' }
 eco_transition_plot <- function(dataset, 
                                 sorting = TRUE, 
                                 highlighting = NULL,
@@ -371,7 +597,7 @@ eco_transition_plot <- function(dataset,
   
   #calculate the starting offset such that 0 is at the bottom
   zero_num_connections <- sum(dataset[1,]) + sum(dataset[,1])
-  total_connections <- 2 * sum(z)
+  total_connections <- 2 * sum(dataset)
   degrees_per_connection <- (360 - sum(circos.par$gap.degree[circos.par$gap.degree > 1])) / 
     total_connections
   circos.par$start.degree <- -90 + (zero_num_connections * degrees_per_connection / 2)
