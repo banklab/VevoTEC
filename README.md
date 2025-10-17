@@ -1,9 +1,9 @@
 [1. Introduction](#Introduction)
-[2. Getting Started](#Getting Started)
+[2. Installation](#Installation)
 [3. Usage](#Usage)
 
-#Introduction
+# Introduction
 
-#Getting Started
+# Installation
 
-#Usage
+# Usage
