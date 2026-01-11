@@ -610,33 +610,35 @@ eco_transition_plot <- function(dataset,
                col = link_colors,
                direction.type = "arrows",
                link.arr.col = arrow_colors,
+               self.link = 1,
                preAllocateTracks = list(
                  list(track.height = 0.05),
                  list(track.height = 0.025),
                  list(track.height = 0.05)
                ))
-#  circos.track(
-#    track.index = 3, 
-#    panel.fun = function(x, y) {
-#      xlim <- CELL_META$xlim
-#      ylim <- CELL_META$ylim
-#      sector.name <- CELL_META$sector.index
-#      xcenter <- CELL_META$xcenter
-#      circos.rect(
-#        xleft = xlim[1], ybottom = ylim[1],
-#        xright = xlim[2], ytop = ylim[2],
-#        col = rand_color(1), # need to figure out an opacity parameter
-#        border = NA)
-#      }, 
-#    bg.border = NA
-#  )
+ circos.track(
+   track.index = 3,
+   panel.fun = function(x, y) {
+     xlim <- CELL_META$xlim
+     ylim <- CELL_META$ylim
+     sector.name <- CELL_META$sector.index
+     xcenter <- CELL_META$xcenter
+     circos.rect(
+       xleft = xlim[1], ybottom = ylim[1],
+       xright = xlim[2], ytop = ylim[2],
+       col = "#00000000", 
+       border = NA)
+     },
+   bg.border = NA
+ )
   circos.track(
     track.index = 2,
     panel.fun = function(x, y) {
       sector.name <- CELL_META$sector.index
       xcenter <- CELL_META$xcenter
       circos.text(CELL_META$xcenter, CELL_META$ylim[1], plot_labels[sector.name],
-                  facing = "downward", niceFacing = TRUE)
+                  facing = "downward", niceFacing = TRUE,
+                  cex = 0.75)
       },
     bg.border = NA
   )

@@ -19,7 +19,7 @@ ui <- page_sidebar(
         value = "Upload Data",
         fileInput(
           inputId = "file",
-          label = "Select a File:", 
+          label = "Select a file:", 
           multiple = FALSE
         ),
         checkboxInput("sorting", "Sort by input label order", TRUE)
@@ -84,10 +84,25 @@ server <- function(input, output){
       }, error = function(e){
         NULL
       })
+      for (label in rownames(mat)){
+        width <- set_bitwidth(label)
+        focal <- substring(label, 2, 1 + width)
+        for (target in colnames(mat)){
+          partner <- substring(target, 2, 1 + width)
+          if (partner == focal){
+            mat[label, target] <- 0
+          }
+        }
+      }
       err <- "Please ensure that genotypes in your uploaded data have transitions of hamming distance 1."
     } else { # else assume it is already an adjacency matrix
       mat <- read.table(input$file$datapath, sep = " ", header = T, check.names = F) %>% 
         as.matrix()
+      for (i in 1:ncol(mat)){
+        if (sum(mat[i,] == mat[,i]) == length(mat[i,]) && sum(mat[i,] == 0)){
+          mat[i,i] <- 1
+        }  
+      }
       err <- "Please ensure that your uploaded data is not a zero matrix."
     }
     validate( # Enforce that the processed data have transitions in them
@@ -213,8 +228,23 @@ server <- function(input, output){
       custom_order <- sort_labels(labels())
     }
     plot_title <- NULL
+    # if (tools::file_ext(input$file$datapath) == "csv"){
+    #   highlight_mode <- "all"
+    #   highlighting <- c()
+    #   for (label in rownames(dataset)){
+    #     width <- set_bitwidth(label)
+    #     focal <- substring(label, 2, 1 + width)
+    #     for (target in colnames(dataset)){
+    #       partner <- substring(target, 2, 1 + width)
+    #       if (partner != focal){
+    #         highlighting <- c(highlighting, label)
+    #       }
+    #     }
+    #   }
+    # } else {
     highlighting <- NULL
     highlight_mode <- "all" # By default, we visualize everything in the plot
+    # }
     if (is.null(selected_peaks()) == FALSE){
       highlighting <- list()
       for (peak in selected_peaks()){
@@ -230,7 +260,7 @@ server <- function(input, output){
     }
     rownames(dataset) <- colnames(dataset) # For now, we will only accept a matrix with identically ordered labels
     eco_transition_plot(dataset = dataset, highlighting = highlighting, sector_order = custom_order, plot_labels = labels(), highlight_mode = highlight_mode)
-    title(plot_title)
+    title(plot_title, cex.main = 0.5)
   })
 }
 
