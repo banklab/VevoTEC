@@ -76,7 +76,7 @@ parse_fitness_table <- function(input_data){
 #' fitnesses_to_adjacency(data)
 fitnesses_to_adjacency <- function(input_data){
   # we first determine which transitions are possible (have hamming distance of 1)
-    # we do this by comparing the min sum of hamming distances between the two comparison possibilities e.g. a1b1+a2b2 vs a1b2 + a2b1 
+    # we do this by comparing the min sum of hamming distances between the two comparison possibilities e.g. a1b1 + a2b2 vs a1b2 + a2b1 
   n <- length(input_data$ID)
   transition_matrix <- matrix(0, nrow = n, ncol = n, dimnames = list(input_data$ID, input_data$ID))
   for (i in 1:(n-1)){ # to make pairwise comparisons between all IDs
@@ -315,7 +315,9 @@ generate_sector_colors <- function(dataset, input_labels, highlighting = NULL){
   i <- 1
   for(label in binary_labels){
     order <- length(strsplit(label, "\n")[[1]]) # Find which interaction order (of the source) based on commas in label
-    if(is.null(highlighting) == FALSE && !(label %in% binary_highlights)){ # if we pass the highlighting, set everything else to opaque
+    if(sum(dataset[i,]) == 1 && dataset[i,i] == 1){ # this is a weird edge case for self-connected singleton nodes
+      sector_colors <- c(sector_colors, color_options[[(order * 4) - 2]])
+    } else if(is.null(highlighting) == FALSE && !(label %in% binary_highlights)){ # if we pass the highlighting, set everything else to opaque
       sector_colors <- c(sector_colors, color_options[[(order * 4)]])
     } else if(sum(dataset[i,]) != 0 && sum(dataset[,i]) != 0){ # else if is not a peak
       sector_colors <- c(sector_colors, color_options[[(order * 4) - 3]])
@@ -323,7 +325,7 @@ generate_sector_colors <- function(dataset, input_labels, highlighting = NULL){
      sector_colors <- c(sector_colors, color_options[[(order * 4) - 1]])
     } else if(sum(dataset[i,]) == 0){ # if it is a peak:
       sector_colors <- c(sector_colors, color_options[[(order * 4) - 2]])
-    }
+    } 
     i <- i + 1
   }
   names(sector_colors) = input_labels

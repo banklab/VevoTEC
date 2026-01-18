@@ -260,7 +260,7 @@ server <- function(input, output){
     }
     rownames(dataset) <- colnames(dataset) # For now, we will only accept a matrix with identically ordered labels
     eco_transition_plot(dataset = dataset, highlighting = highlighting, sector_order = custom_order, plot_labels = labels(), highlight_mode = highlight_mode)
-    title(plot_title, cex.main = 0.5)
+    #title(plot_title, cex.main = 0.5)
   })
 }
 
