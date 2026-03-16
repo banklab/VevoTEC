@@ -16,7 +16,7 @@ VevoTEC can be installed from the command line with `git clone git@github.com:ba
 
 ### Run
 
-VevoTEC is an Rshiny dashboard that allows for the visualization of multi-species eco-evo dynamics using circos plots. It can be run through an R IDE of choice, or on the command line via `R -e "shiny::runApp('VevoTEC/app')"`, and visiting the corresponding localhost port.   
+VevoTEC is an Rshiny dashboard that allows for the visualization of multi-species eco-evo dynamics using circos plots. It can be run through an R IDE of choice, or on the command line via `R -e "shiny::runApp('VevoTEC/R')"`, and visiting the corresponding localhost port.   
 
 Contained are three widgets that allow for the upload of datasets, and different visualizations of data:
 Widget | Functionality
